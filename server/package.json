@@ -1,0 +1,16 @@
+{
+  "name": "eventsync-server",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "node --watch --env-file-if-exists=../.env src/index.js",
+    "start": "node --env-file-if-exists=../.env src/index.js",
+    "test": "node --test",
+    "db:init": "node --env-file-if-exists=../.env src/db/setup.js",
+    "db:seed": "node --env-file-if-exists=../.env src/db/setup.js"
+  },
+  "dependencies": {
+    "better-sqlite3": "12.4.1",
+    "express": "5.1.0"
+  }
+}
