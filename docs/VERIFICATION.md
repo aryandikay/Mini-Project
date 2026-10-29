@@ -1,4 +1,21 @@
-# Current Phase 3 verification
+# Current Phase 4 verification
+
+- `npm test`: **82 passed, 0 failed, 0 skipped**, including earlier-phase regressions and independent-connection concurrency tests.
+- `npm run build`: passed, 53 modules transformed.
+- `PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH=/usr/bin/chromium npm run test:e2e`: **7 passed, 0 failed**.
+- `git diff --check`: passed.
+
+Recommendation tests cover grid and buffer boundaries, safe calendar arithmetic, duration/requirements preservation, bounded settings, ranking and deterministic tie-breaking, every returned result passing the allocator, capacity/projector/audio/staff infeasibility, multi-date searches, and zero resources. Snapshot tests compare every booking/client/venue/hall row and SQLite total_changes before and after search. Actual database errors return errors rather than fake empty results.
+
+A later-date test exposed ranking by total elapsed minutes rather than time-of-day deviation; the ranking was corrected, preserving the test expectation. Browser fixture selectors were narrowed to exact event headings because blocker events shared the same client name. All final checks passed.
+
+Real-browser tests verify the rejected-request action, returned options, explicit selection/confirmation, distinct new request ID, preserved original rejection, actual allocation, changed availability between search and confirmation, refresh, no-results, network-error recovery and mobile overflow. The existing protected confirmation path retains its independent-connection race tests; these are focused correctness checks, not load benchmarks. Tests use isolated databases.
+
+Optional rescheduling recommendation integration is deferred; its optional recommendation-specific tests are not claimed as executed. Prior rescheduling preservation and concurrency tests still pass. Windows, load testing and the separately unavailable official PDF remain unverified. See [RECOMMENDATIONS.md](RECOMMENDATIONS.md) for exact defaults, grid limitations and complexity.
+
+---
+
+# Historical Phase 3 verification
 
 - `npm test`: **67 passed, 0 failed, 0 skipped** (includes Phase 1/2 regressions).
 - `npm run build`: passed, 52 modules transformed.

@@ -1,4 +1,7 @@
 import { invalid } from "./errors.js";
+export const OPERATING_START = 480,
+  OPERATING_END = 1320,
+  BUFFER = 30;
 export function validateDate(value) {
   if (
     typeof value !== "string" ||
@@ -25,9 +28,12 @@ export function reservationInterval(startTime, endTime) {
     endMinute = timeToMinutes(endTime);
   if (endMinute <= startMinute)
     invalid("End time must be after start time on the same day.");
-  const reservedStartMinute = startMinute - 30,
-    reservedEndMinute = endMinute + 30;
-  if (reservedStartMinute < 480 || reservedEndMinute > 1320)
+  const reservedStartMinute = startMinute - BUFFER,
+    reservedEndMinute = endMinute + BUFFER;
+  if (
+    reservedStartMinute < OPERATING_START ||
+    reservedEndMinute > OPERATING_END
+  )
     invalid(
       "Include 30 minutes for setup and cleanup within 08:00–22:00. Event times must fall within 08:30–21:30.",
     );

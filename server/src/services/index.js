@@ -1,3 +1,5 @@
+import { recommendationService } from "./recommendations.js";
+import { normalizeScheduling } from "../utils/schedulingInput.js";
 import { lifecycle } from "./lifecycle.js";
 import { venueNow } from "../utils/venueClock.js";
 import { allocate } from "./scheduler.js";
@@ -9,10 +11,11 @@ import {
   statuses,
   idParam,
 } from "../utils/validation.js";
-import { reservationInterval, validateDate } from "../utils/time.js";
+import { validateDate } from "../utils/time.js";
 export function createService(repo) {
   return {
     ...lifecycle(repo, normalizeBooking),
+    recommendations: recommendationService(repo),
     dashboard: () => repo.readTransaction(() => repo.dashboard(venueNow())),
     health() {
       repo.health();
@@ -98,12 +101,6 @@ export function normalizeBooking(body) {
   return {
     clientId: integer(body.clientId, "clientId", 1),
     eventName: text(body.eventName, "Event name", 160),
-    eventDate: validateDate(body.eventDate),
-    ...reservationInterval(body.startTime, body.endTime),
-    attendees: integer(body.attendees, "Attendees", 1),
-    preferredVenueId: integer(body.preferredVenueId, "preferredVenueId", 1),
-    projectorsRequired: integer(body.projectorsRequired, "Projectors"),
-    audioRequired: integer(body.audioRequired, "Audio systems"),
-    staffRequired: integer(body.staffRequired, "Staff"),
+    ...normalizeScheduling(body),
   };
 }

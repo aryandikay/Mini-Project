@@ -1,3 +1,4 @@
+import Recommendations from "../components/Recommendations.jsx";
 import LifecycleActions from "../components/LifecycleActions.jsx";
 import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
@@ -67,6 +68,13 @@ export default function BookingDetail({ venues, clients, onChanged }) {
             {state.booking.status === "PENDING" &&
               " This request is awaiting allocation and is not confirmed."}
           </div>
+          {state.booking.status === "REJECTED" && (
+            <Recommendations
+              key={id}
+              booking={state.booking}
+              onChanged={onChanged}
+            />
+          )}
           <LifecycleActions
             key={id}
             booking={state.booking}

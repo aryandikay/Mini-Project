@@ -1,6 +1,8 @@
 import { idParam } from "../utils/validation.js";
 export function createControllers(service) {
   return {
+    recommendations: (req, res) =>
+      res.json({ data: service.recommendations(req.body) }),
     dashboard: (req, res) => res.json({ data: service.dashboard() }),
     cancelBooking: (req, res) =>
       res.json({

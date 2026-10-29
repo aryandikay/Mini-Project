@@ -319,3 +319,174 @@ test("full lifecycle: reschedule, preserve failed proposal, schedule and dashboa
     ),
   ).toBe(true);
 });
+
+async function rejectedRecommendationFixture(page, date, name) {
+  const client = (
+    await (
+      await page.request.post("/api/clients", {
+        data: { name: `Client ${name}` },
+      })
+    ).json()
+  ).data;
+  const original = {
+    clientId: client.id,
+    eventName: name,
+    eventDate: date,
+    startTime: "10:00",
+    endTime: "12:00",
+    attendees: 250,
+    preferredVenueId: 3,
+    projectorsRequired: 1,
+    audioRequired: 1,
+    staffRequired: 1,
+  };
+  await page.request.post("/api/bookings", {
+    data: { ...original, eventName: "Recommendation blocker" },
+  });
+  await page.goto("/new");
+  await page
+    .getByLabel("Client", { exact: true })
+    .selectOption(String(client.id));
+  await page.getByLabel("Event name").fill(name);
+  await page.getByLabel("Event date").fill(date);
+  await page.getByLabel("Start time").fill("10:00");
+  await page.getByLabel("End time").fill("12:00");
+  await page.getByLabel("Attendees").fill("250");
+  await page.getByLabel("Preferred venue").selectOption("3");
+  await page.getByLabel("Projectors", { exact: true }).fill("1");
+  await page.getByLabel("Audio systems", { exact: true }).fill("1");
+  await page.getByLabel("Support staff", { exact: true }).fill("1");
+  await page.getByRole("button", { name: "Submit event request" }).click();
+  const card = page
+    .locator(".request-card")
+    .filter({ has: page.getByRole("heading", { name, exact: true }) });
+  await expect(card.locator(".badge")).toContainText("Rejected");
+  await card.getByRole("link", { name: "Find alternatives" }).click();
+  return original;
+}
+test("recommendation UI searches and confirms a new booking while preserving rejected history", async ({
+  page,
+}) => {
+  await rejectedRecommendationFixture(
+    page,
+    "2099-08-01",
+    "Alternative browser event",
+  );
+  const originalUrl = page.url();
+  await page
+    .getByRole("button", { name: "Search alternatives", exact: true })
+    .click();
+  await expect(
+    page.getByRole("heading", { name: "Option 1: Venue C · Hall C2" }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("region", { name: "Alternative recommendations" }),
+  ).toContainText("13:00 – 15:00");
+  await page
+    .getByRole("button", { name: "Select option 1", exact: true })
+    .click();
+  await page
+    .getByRole("button", { name: "Confirm alternative", exact: true })
+    .click();
+  await expect(
+    page.getByRole("status").filter({ hasText: "New booking #" }),
+  ).toContainText("confirmed: Venue C · Hall C2");
+  await page.getByRole("link", { name: /View new request/ }).click();
+  await expect(page.locator(".badge")).toContainText("Confirmed");
+  await expect(page.locator(".request-card")).toContainText("13:00 – 15:00");
+  expect(page.url()).not.toBe(originalUrl);
+  await page.goto(originalUrl);
+  await expect(page.locator(".badge")).toContainText("Rejected");
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page
+    .getByRole("button", { name: "Search alternatives", exact: true })
+    .click();
+  await expect(
+    page.getByRole("button", { name: "Select option 1", exact: true }),
+  ).toBeVisible();
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= innerWidth,
+    ),
+  ).toBe(true);
+});
+test("recommendation confirmation revalidates changed availability and permits refresh", async ({
+  page,
+}) => {
+  const original = await rejectedRecommendationFixture(
+    page,
+    "2099-09-01",
+    "Stale alternative",
+  );
+  await page
+    .getByRole("button", { name: "Search alternatives", exact: true })
+    .click();
+  await page
+    .getByRole("button", { name: "Select option 1", exact: true })
+    .click();
+  const taken = await page.request.post("/api/bookings", {
+    data: {
+      ...original,
+      eventName: "Concurrent taker",
+      startTime: "13:00",
+      endTime: "15:00",
+    },
+  });
+  expect((await taken.json()).data.status).toBe("CONFIRMED");
+  await page
+    .getByRole("button", { name: "Confirm alternative", exact: true })
+    .click();
+  await expect(page.getByRole("alert")).toContainText("Availability changed");
+  await expect(page.locator(".badge")).toContainText("Rejected");
+  await page
+    .getByRole("button", { name: "Search alternatives", exact: true })
+    .click();
+  await expect(
+    page.getByRole("button", { name: "Select option 1", exact: true }),
+  ).toBeVisible();
+});
+test("recommendation empty state and network error recovery", async ({
+  page,
+}) => {
+  const client = (
+    await (
+      await page.request.post("/api/clients", {
+        data: { name: "No alternatives" },
+      })
+    ).json()
+  ).data;
+  const rejected = (
+    await (
+      await page.request.post("/api/bookings", {
+        data: {
+          clientId: client.id,
+          eventName: "Impossible demand",
+          eventDate: "2099-10-01",
+          startTime: "10:00",
+          endTime: "12:00",
+          attendees: 999,
+          preferredVenueId: 1,
+          projectorsRequired: 0,
+          audioRequired: 0,
+          staffRequired: 0,
+        },
+      })
+    ).json()
+  ).data;
+  await page.goto(`/bookings/${rejected.id}`);
+  await page.route("**/api/recommendations", (route) => route.abort());
+  await page
+    .getByRole("button", { name: "Search alternatives", exact: true })
+    .click();
+  await expect(page.getByRole("alert")).toContainText("Unable to reach");
+  await page.unroute("**/api/recommendations");
+  await page
+    .getByRole("button", { name: "Search alternatives", exact: true })
+    .click();
+  await expect(page.getByRole("status")).toContainText(
+    "No feasible alternatives found",
+  );
+  await expect(page.getByRole("button", { name: /Select option/ })).toHaveCount(
+    0,
+  );
+});

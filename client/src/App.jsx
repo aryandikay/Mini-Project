@@ -65,7 +65,7 @@ export default function App() {
           <i /> EventSync workspace
         </span>
         <span>
-          PHASE 3 <b>·</b> REQUEST MANAGEMENT
+          PHASE 4 <b>·</b> REQUEST MANAGEMENT
         </span>
       </div>
       <main id="main">

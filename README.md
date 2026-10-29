@@ -1,4 +1,4 @@
-# EventSync — Phase 3
+# EventSync — Phase 4
 
 A local event-request workspace for clients, campus venues, and automatically allocated bookings. React + Vite + Tailwind CSS, Express 5, and SQLite via better-sqlite3. No external accounts or paid services are needed.
 
@@ -79,10 +79,16 @@ See [docs/API.md](docs/API.md) for exact requests, fields, response shapes and e
 
 The Phase 1 and Phase 2 implementation prompts were accessible. The separately referenced official problem statement and research reports remain unavailable. Rules and sample scenarios follow the supplied prompts. Equal choices use capacity, venue ID, then hall ID; this is a documented implementation assumption.
 
-Cancellation and atomic rescheduling are implemented. Recommendations remain deferred. No authentication is implemented; this is a local college prototype. See [lifecycle design and Phase 4 handoff](docs/LIFECYCLE.md) for transaction ownership, complexity and extension points.
+Cancellation and atomic rescheduling are implemented. Alternative recommendations for rejected requests are implemented; optional rescheduling recommendations remain deferred. No authentication is implemented; this is a local college prototype. See [lifecycle design and Phase 4 handoff](docs/LIFECYCLE.md) for transaction ownership, complexity and extension points.
 
 ## Manage bookings
 
 Open a confirmed booking's details to reschedule or cancel it. Cancellation asks for confirmation and retains historical allocation details labeled as released. Rescheduling prefills current scheduling fields; failed proposals keep those entries for correction and leave the original booking visible. Only confirmed records expose lifecycle actions.
 
 The daily Schedule view lists confirmed events for a selected date, grouped by venue, with event and buffered intervals. Booking lists filter by date, status and allocated venue. The dashboard uses `/api/dashboard` for all lifecycle counts and the next ten confirmed events. Successful mutations refetch shared data; other browser sessions can use Refresh data to retrieve changes.
+
+## Search alternatives
+
+Open a rejected request using **Find alternatives**, then choose **Search alternatives**. The default search uses a 15-minute grid on the requested date and returns up to five options. You can expand to three or seven total days and change ranking priority. Select an option and explicitly confirm it to submit a new booking; original rejected history remains unchanged. Availability is rechecked before confirmation.
+
+See [recommendation design and API](docs/RECOMMENDATIONS.md) for search bounds, ranking, complexity, and deferred rescheduling recommendations.

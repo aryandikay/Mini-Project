@@ -56,6 +56,11 @@ export function RequestCards({ bookings }) {
               </dd>
             </div>
           </dl>
+          {booking.status === "REJECTED" && (
+            <Link className="text-link" to={`/bookings/${booking.id}`}>
+              Find alternatives →
+            </Link>
+          )}
           {booking.rejectionReason && (
             <p className="notice error">{booking.rejectionReason}</p>
           )}

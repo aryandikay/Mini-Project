@@ -31,6 +31,8 @@ async function request(path, options) {
   return payload.data;
 }
 export const api = {
+  recommendations: (body) =>
+    request("/recommendations", { method: "POST", body: JSON.stringify(body) }),
   dashboard: () => request("/dashboard"),
   cancel: (id, expectedUpdatedAt) =>
     request(`/bookings/${id}/cancel`, {

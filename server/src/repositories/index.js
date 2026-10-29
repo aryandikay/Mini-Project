@@ -77,6 +77,14 @@ export function createRepository(db) {
     },
     booking: (id) =>
       bookingRow(db.prepare(`${bookingSelect} WHERE b.id=?`).get(id)),
+    reservationsInRange(first, last) {
+      return db
+        .prepare(
+          "SELECT * FROM bookings WHERE status='CONFIRMED' AND event_date BETWEEN ? AND ? ORDER BY event_date,id",
+        )
+        .all(first, last)
+        .map(camelRow);
+    },
     reservations(input, excludeBookingId = null) {
       return db
         .prepare(
