@@ -1,4 +1,4 @@
-# EventSync Phase 2 REST contract
+# EventSync Phase 3 REST contract
 
 Base path `/api`. JSON requests use `Content-Type: application/json`. Success: `{ "data": ... }`. Errors: `{ "error": { "code": "VALIDATION_ERROR", "message": "Human-readable explanation." } }`. All JSON properties use camelCase. Submissions perform atomic scheduling; availability checks return a non-reserving snapshot.
 
@@ -12,7 +12,7 @@ Base path `/api`. JSON requests use `Content-Type: application/json`. Success: `
 | `GET /bookings`     | 200    | Request array, newest ID first                                         |
 | `GET /bookings/:id` | 200    | One request or 404                                                     |
 
-`GET /bookings?date=2027-03-20&status=PENDING` supports either or both exact filters. Status must be `PENDING`, `CONFIRMED`, `REJECTED`, or `CANCELLED`. Invalid filters or IDs return 400; valid IDs without records return 404. List endpoints return an empty array when there are no matches. Pagination and mutation endpoints for later lifecycle states are not part of Phase 2.
+`GET /bookings?date=2027-03-20&status=PENDING` supports either or both exact filters. Status must be `PENDING`, `CONFIRMED`, `REJECTED`, or `CANCELLED`. Invalid filters or IDs return 400; valid IDs without records return 404. List endpoints return an empty array when there are no matches. Pagination is not implemented. Lifecycle endpoints are documented below.
 
 ## Clients
 
@@ -103,3 +103,39 @@ Operating-hour violations continue returning 400 with no record, preserving Phas
 - 500 `INTERNAL_ERROR`: unexpected database or application failure; SQL and stack traces are never returned.
 
 The health response reports database success only when a query succeeds; a database failure uses the same safe 500 envelope. APIs currently have no authentication and are intended for local development.
+
+## Phase 3 lifecycle
+
+`PATCH /bookings/:id/cancel` accepts `{ "expectedUpdatedAt": "<timestamp from GET>" }` or `{}`. It returns 200 `{ data: <cancelled booking>, message: "Booking cancelled. Hall and resources released." }`. All event/allocation fields are preserved for history; cancelled allocations are not active. Repeated cancellation returns 409 `INVALID_STATE` with no further changes.
+
+`PATCH /bookings/:id/reschedule` accepts any nonempty subset of `eventDate`, `startTime`, `endTime`, `attendees`, `preferredVenueId`, `projectorsRequired`, `audioRequired`, and `staffRequired`, plus optional `expectedUpdatedAt`. Unknown fields are rejected; identity, client and event name cannot change. Validation applies after merging with the original record. Success returns 200 `{ data: <updated confirmed booking> }` with the same ID and creation timestamp.
+
+Both operations allow only CONFIRMED records. Missing IDs return 404; malformed IDs/patches return 400. Stale `expectedUpdatedAt` returns 409 `STALE_BOOKING`. The frontend always sends the timestamp; API callers omitting it opt into serialized updates against the latest record.
+
+Infeasible rescheduling returns 409:
+
+```json
+{
+  "error": {
+    "code": "RESCHEDULE_INFEASIBLE",
+    "message": "Rescheduling was not accepted. The original booking is unchanged.",
+    "details": {
+      "bookingId": 1,
+      "originalPreserved": true,
+      "reasons": [
+        {
+          "code": "INSUFFICIENT_HALL_CAPACITY",
+          "venueId": 1,
+          "message": "Venue A: No hall seats 999 attendees. Maximum capacity is 150."
+        }
+      ]
+    }
+  }
+}
+```
+
+The reasons above illustrate one venue; actual responses contain all computed failures. No original fields, timestamp or rejection reason change. No separate rejected booking is inserted.
+
+`GET /bookings?date=2099-01-01&status=CONFIRMED&venueId=1` combines optional exact filters. Venue filtering uses allocated venue, including historical allocations on cancelled records; unallocated pending/rejected records do not match a venue. Ordering remains newest ID first.
+
+`GET /dashboard` returns `{ data: { counts: { PENDING, CONFIRMED, REJECTED, CANCELLED }, totalBookings, totalVenues, totalHalls, upcoming, today, timeZone } }`. Counts come from all persisted records. `upcoming` contains up to ten confirmed bookings ordered by date, start minute, ID whose start is at or after the current venue-local minute. `VENUE_TIME_ZONE` defaults to UTC and accepts an IANA timezone. This is a documented default, not an inferred campus location. Invalid timezone configuration causes a safe server error; correct it and restart.

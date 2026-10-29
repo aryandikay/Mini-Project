@@ -18,15 +18,30 @@ async function request(path, options) {
       "EventSync returned an unreadable response. Please try again.",
     );
   }
-  if (!response.ok)
-    throw new Error(
+  if (!response.ok) {
+    const error = new Error(
       payload.error?.message || "The request could not be completed.",
     );
+    error.code = payload.error?.code;
+    error.details = payload.error?.details;
+    throw error;
+  }
   if (!Object.hasOwn(payload, "data"))
     throw new Error("EventSync returned an incomplete response.");
   return payload.data;
 }
 export const api = {
+  dashboard: () => request("/dashboard"),
+  cancel: (id, expectedUpdatedAt) =>
+    request(`/bookings/${id}/cancel`, {
+      method: "PATCH",
+      body: JSON.stringify({ expectedUpdatedAt }),
+    }),
+  reschedule: (id, body) =>
+    request(`/bookings/${id}/reschedule`, {
+      method: "PATCH",
+      body: JSON.stringify(body),
+    }),
   venues: () => request("/venues"),
   clients: () => request("/clients"),
   bookings: (filters) =>

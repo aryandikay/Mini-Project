@@ -1,14 +1,39 @@
-import { useState } from "react";
+import { api } from "../services/api.js";
+import { useEffect, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { PageTitle, Feedback, Empty, Field } from "../components/Common.jsx";
 import { RequestCards } from "../components/RequestCards.jsx";
-export default function Bookings({ bookings }) {
+export default function Bookings({ bookings, venues }) {
   const [date, setDate] = useState(""),
     [status, setStatus] = useState("");
   const location = useLocation();
-  const filtered = bookings.filter(
-    (b) => (!date || b.eventDate === date) && (!status || b.status === status),
-  );
+  const [venueId, setVenue] = useState(""),
+    [filtered, setFiltered] = useState(bookings),
+    [loading, setLoading] = useState(false),
+    [error, setError] = useState("");
+  useEffect(() => {
+    let active = true;
+    setLoading(true);
+    setError("");
+    api
+      .bookings({
+        ...(date ? { date } : {}),
+        ...(status ? { status } : {}),
+        ...(venueId ? { venueId } : {}),
+      })
+      .then((rows) => {
+        if (active) setFiltered(rows);
+      })
+      .catch((e) => {
+        if (active) setError(e.message);
+      })
+      .finally(() => {
+        if (active) setLoading(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, [date, status, venueId, bookings]);
   return (
     <>
       <PageTitle
@@ -51,11 +76,22 @@ export default function Bookings({ bookings }) {
             ))}
           </select>
         </Field>
+        <Field label="Venue">
+          <select value={venueId} onChange={(e) => setVenue(e.target.value)}>
+            <option value="">All venues</option>
+            {venues.map((v) => (
+              <option key={v.id} value={v.id}>
+                {v.name}
+              </option>
+            ))}
+          </select>
+        </Field>
         <button
           className="button secondary"
           onClick={() => {
             setDate("");
             setStatus("");
+            setVenue("");
           }}
         >
           Clear filters
@@ -64,7 +100,11 @@ export default function Bookings({ bookings }) {
           {filtered.length} request{filtered.length === 1 ? "" : "s"}
         </span>
       </div>
-      {filtered.length ? (
+      {loading ? (
+        <Feedback>Loading requests…</Feedback>
+      ) : error ? (
+        <Feedback error={error} />
+      ) : filtered.length ? (
         <RequestCards bookings={filtered} />
       ) : (
         <Empty

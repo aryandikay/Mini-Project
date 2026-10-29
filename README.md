@@ -1,8 +1,8 @@
-# EventSync — Phase 2
+# EventSync — Phase 3
 
 A local event-request workspace for clients, campus venues, and automatically allocated bookings. React + Vite + Tailwind CSS, Express 5, and SQLite via better-sqlite3. No external accounts or paid services are needed.
 
-New requests are automatically **CONFIRMED** with a venue/hall or **REJECTED** with constraint explanations. Capacity, buffered hall conflicts and peak shared-resource usage are checked atomically. Historical Phase 1 pending requests remain unchanged. See [scheduling design](docs/SCHEDULING.md).
+New requests are automatically **CONFIRMED** with a venue/hall or **REJECTED** with constraint explanations. Capacity, buffered hall conflicts and peak shared-resource usage are checked atomically. Historical Phase 1 pending requests remain unchanged. Confirmed bookings can now be cancelled or rescheduled from their details page. Failed rescheduling preserves the original reservation. See [lifecycle design](docs/LIFECYCLE.md) and [scheduling design](docs/SCHEDULING.md).
 
 ## Quick start
 
@@ -16,7 +16,7 @@ npm run dev
 
 The dashboard runs on port 5173 and the API on port 3001. Vite proxies `/api` to Express. `npm run dev` starts both processes; Ctrl+C stops them. Alternatively, run `npm run dev:server` and `npm run dev:client` in separate terminals. Commands work with npm on Windows as well as Linux; native better-sqlite3 builds may require platform build tools if a prebuilt binary is unavailable.
 
-Optional: copy `.env.example` to `.env`. `PORT` changes the API port; update `API_PROXY_TARGET` to match, then restart both services. `DB_PATH` is resolved relative to `server/` unless absolute; the default is `server/data/eventsync.sqlite`. Database files and `.env` are ignored by Git. No secrets are required. Dates and times represent **venue-local civil time**, without timezone conversion; timestamps use UTC. The venue's geographic timezone was not supplied.
+Optional: copy `.env.example` to `.env`. `PORT` changes the API port; update `API_PROXY_TARGET` to match, then restart both services. `DB_PATH` is resolved relative to `server/` unless absolute; the default is `server/data/eventsync.sqlite`. Database files and `.env` are ignored by Git. No secrets are required. Dates and times represent **venue-local civil time**, without timezone conversion; timestamps use UTC. The venue's geographic timezone was not supplied. `VENUE_TIME_ZONE` defaults to UTC for dashboard time comparisons; set an IANA zone such as `Asia/Kolkata` for the campus. Stored event dates/times are never converted.
 
 ## Use the application
 
@@ -61,7 +61,7 @@ For a local production-mode check, run `npm run build` followed by `npm start` a
 
 Four tables: `clients`, `venues`, `halls`, `bookings`. A client has many requests; a venue has many halls and venue-wide resource inventory. Requests reference clients and preferred venues. Nullable allocated venue/hall fields support future scheduling, with a composite foreign key preventing hall/venue mismatches. States are `PENDING`, `CONFIRMED`, `REJECTED`, `CANCELLED`; pending rows cannot have allocation and confirmed rows must have it. Numeric, interval, status and relationship constraints are enforced in SQLite, with stricter calendar/type validation in the service layer. Indexes cover date, status, hall/date/interval and allocated venue/date/interval.
 
-Booking rows store event date, integer event and reserved start/end minutes, attendees, requested resources, allocation fields, status, optional rejection reason, and creation/update timestamps. Inventory is never duplicated onto halls and no mutable utilization counter is stored. Future lifecycle services must update `updated_at` explicitly; Phase 2 exposes no update or delete endpoint. Startup additively migrates `reason_details` for structured rejection explanations without changing historical rows. Future schema changes require deliberate non-destructive migrations.
+Booking rows store event date, integer event and reserved start/end minutes, attendees, requested resources, allocation fields, status, optional rejection reason, and creation/update timestamps. Inventory is never duplicated onto halls and no mutable utilization counter is stored. Future lifecycle services must update `updated_at` explicitly; Phase 3 exposes guarded lifecycle updates but no delete endpoint. Startup additively migrates `reason_details` for structured rejection explanations without changing historical rows. Future schema changes require deliberate non-destructive migrations.
 
 | Venue   | Halls and capacities       | Projectors | Audio systems | Support staff |
 | ------- | -------------------------- | ---------- | ------------- | ------------- |
@@ -79,4 +79,10 @@ See [docs/API.md](docs/API.md) for exact requests, fields, response shapes and e
 
 The Phase 1 and Phase 2 implementation prompts were accessible. The separately referenced official problem statement and research reports remain unavailable. Rules and sample scenarios follow the supplied prompts. Equal choices use capacity, venue ID, then hall ID; this is a documented implementation assumption.
 
-Cancellation, rescheduling and recommendations remain deferred. No authentication is implemented; this is a local college prototype. See [scheduling design and Phase 3 handoff](docs/SCHEDULING.md) for transaction ownership, complexity and extension points.
+Cancellation and atomic rescheduling are implemented. Recommendations remain deferred. No authentication is implemented; this is a local college prototype. See [lifecycle design and Phase 4 handoff](docs/LIFECYCLE.md) for transaction ownership, complexity and extension points.
+
+## Manage bookings
+
+Open a confirmed booking's details to reschedule or cancel it. Cancellation asks for confirmation and retains historical allocation details labeled as released. Rescheduling prefills current scheduling fields; failed proposals keep those entries for correction and leave the original booking visible. Only confirmed records expose lifecycle actions.
+
+The daily Schedule view lists confirmed events for a selected date, grouped by venue, with event and buffered intervals. Booking lists filter by date, status and allocated venue. The dashboard uses `/api/dashboard` for all lifecycle counts and the next ten confirmed events. Successful mutations refetch shared data; other browser sessions can use Refresh data to retrieve changes.

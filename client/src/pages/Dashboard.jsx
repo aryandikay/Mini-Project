@@ -1,20 +1,16 @@
 import { Link } from "react-router-dom";
 import { PageTitle, Empty } from "../components/Common.jsx";
 import { RequestCards } from "../components/RequestCards.jsx";
-export default function Dashboard({ venues, bookings }) {
+export default function Dashboard({ venues, bookings, dashboard }) {
   const stats = [
-    ["Venues", venues.length, "Across the event campus"],
-    [
-      "Halls",
-      venues.reduce((n, v) => n + v.halls.length, 0),
-      "Spaces for every gathering",
-    ],
-    ["Submitted requests", bookings.length, "All event requests"],
-    [
-      "Pending allocation",
-      bookings.filter((b) => b.status === "PENDING").length,
-      "Awaiting scheduling review",
-    ],
+    ["Venues", dashboard.totalVenues, "Across the event campus"],
+    ["Halls", dashboard.totalHalls, "Event spaces"],
+    ["Submitted requests", dashboard.totalBookings, "All states"],
+    ...Object.entries(dashboard.counts).map(([status, count]) => [
+      status.charAt(0) + status.slice(1).toLowerCase(),
+      count,
+      "Persisted bookings",
+    ]),
   ];
   return (
     <>
@@ -33,7 +29,7 @@ export default function Dashboard({ venues, bookings }) {
         {stats.map(([label, value, caption], i) => (
           <article className="stat" key={label}>
             <div className={`stat-symbol symbol-${i}`} aria-hidden="true">
-              {["▦", "▥", "▤", "◷"][i]}
+              {["▦", "▥", "▤", "◷"][i % 4]}
             </div>
             <p>{label}</p>
             <strong>{value}</strong>
@@ -102,6 +98,19 @@ export default function Dashboard({ venues, bookings }) {
           Inventory is shared between halls. Availability is assessed during
           allocation.
         </p>
+      </section>
+      <section>
+        <div className="section-heading">
+          <h2>Upcoming confirmed events</h2>
+          <span className="muted">{dashboard.timeZone}</span>
+        </div>
+        {dashboard.upcoming.length ? (
+          <RequestCards bookings={dashboard.upcoming} />
+        ) : (
+          <Empty title="No upcoming confirmed events">
+            Events appear here when their confirmed start time is in the future.
+          </Empty>
+        )}
       </section>
       <section>
         <div className="section-heading">

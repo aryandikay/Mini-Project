@@ -26,6 +26,6 @@ Run `npm test`, `npm run build`, and `PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH=/usr/b
 
 Concurrency testing releases two worker threads with independent SQLite connections from a shared-memory barrier. Both contend for the only capacity-eligible hall (250 attendees); exactly one confirms and the other rejects. This is real concurrent database access, not two sequential HTTP calls. It is a focused race regression, not a distributed-system or load benchmark.
 
-## Phase 3 extension points
+## Lifecycle integration (implemented in Phase 3)
 
-Use the same transaction owner and allocator for rescheduling, excluding the booking being replaced from reservations and replacing it atomically only on success. Cancellation can change status so the existing confirmed-only query automatically stops counting the allocation; no resource counters need releasing. Preserve historical rows and update `updated_at` explicitly. Existing pending requests need an explicitly authorized processing workflow. Cancellation, rescheduling, recommendations and any such workflow are not implemented here.
+`services/lifecycle.js` uses the same transaction owner and allocator for rescheduling, excluding only the booking being replaced from reservations and updating atomically on success. Cancellation changes status so the confirmed-only query stops counting it. No resource counters are used. See [LIFECYCLE.md](LIFECYCLE.md) for stale edit handling, state transitions and tests. Recommendations remain deferred.

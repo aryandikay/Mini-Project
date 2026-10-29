@@ -1,4 +1,19 @@
-# Current Phase 2 verification
+# Current Phase 3 verification
+
+- `npm test`: **67 passed, 0 failed, 0 skipped** (includes Phase 1/2 regressions).
+- `npm run build`: passed, 52 modules transformed.
+- `PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH=/usr/bin/chromium npm run test:e2e`: **4 passed, 0 failed**.
+- `git diff --check`: passed.
+
+Lifecycle tests verify real cancellation/resource release, preserved historical data, successful and failed rescheduling, identity stability, field-for-field failed-proposal preservation, invalid state transitions, repeated cancellation, stale edits, conditional updates, post-write rollback and restart persistence. Four independent-connection race cases cover reschedule/new creation, competing reschedules, cancel/reschedule, and stale same-record edits. API tests cover the new routes, structured conflicts, filters and dashboard counts/time boundaries.
+
+Real-browser tests cover creation, allocated details, successful rescheduling, an infeasible proposal retaining both original allocation and editable proposed values, schedule movement, explicit cancellation confirmation, persisted cancelled status, updated dashboard counts and responsive overflow checks. The existing browser assertion was narrowed to the confirmation status when the new list loading indicator introduced a second status element; the original assertion's intent is retained.
+
+All tests use isolated databases. HTTP/browser tests ran outside the command sandbox because local sockets are restricted. No existing scheduler regression tests were removed, no dependencies changed, and no development bookings were created by verification. Windows and load testing remain unverified. The separate official PDF was unavailable. See [LIFECYCLE.md](LIFECYCLE.md) for the UTC-default venue clock assumption and optional API concurrency token semantics.
+
+---
+
+# Historical Phase 2 verification
 
 - `npm test`: 52 passed, 0 failed, 0 skipped.
 - `npm run build`: production build passed.

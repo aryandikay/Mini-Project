@@ -1,3 +1,4 @@
+import Schedule from "./pages/Schedule.jsx";
 import { useCallback, useEffect, useState } from "react";
 import { Link, NavLink, Route, Routes } from "react-router-dom";
 import { api } from "./services/api.js";
@@ -11,16 +12,17 @@ export default function App() {
   const [data, setData] = useState({ venues: [], clients: [], bookings: [] });
   const [loading, setLoading] = useState(true),
     [error, setError] = useState("");
-  const refresh = useCallback(async () => {
-    setLoading(true);
+  const refresh = useCallback(async (quiet = false) => {
+    if (quiet !== true) setLoading(true);
     setError("");
     try {
-      const [venues, clients, bookings] = await Promise.all([
+      const [venues, clients, bookings, dashboard] = await Promise.all([
         api.venues(),
         api.clients(),
         api.bookings(),
+        api.dashboard(),
       ]);
-      setData({ venues, clients, bookings });
+      setData({ venues, clients, bookings, dashboard });
     } catch (e) {
       setError(e.message);
     } finally {
@@ -35,11 +37,7 @@ export default function App() {
       ...current,
       clients: [client, ...current.clients],
     }));
-  const addBooking = (booking) =>
-    setData((current) => ({
-      ...current,
-      bookings: [booking, ...current.bookings],
-    }));
+  const addBooking = () => refresh(true);
   return (
     <div className="app-shell">
       <header className="topbar">
@@ -55,6 +53,7 @@ export default function App() {
             Overview
           </NavLink>
           <NavLink to="/bookings">Event requests</NavLink>
+          <NavLink to="/schedule">Schedule</NavLink>
           <NavLink to="/clients">Clients</NavLink>
         </nav>
         <Link to="/new" className="header-action">
@@ -66,7 +65,7 @@ export default function App() {
           <i /> EventSync workspace
         </span>
         <span>
-          PHASE 2 <b>·</b> REQUEST MANAGEMENT
+          PHASE 3 <b>·</b> REQUEST MANAGEMENT
         </span>
       </div>
       <main id="main">
@@ -101,9 +100,30 @@ export default function App() {
             />
             <Route
               path="/bookings"
-              element={<Bookings bookings={data.bookings} />}
+              element={
+                <Bookings bookings={data.bookings} venues={data.venues} />
+              }
             />
-            <Route path="/bookings/:id" element={<BookingDetail />} />
+            <Route
+              path="/bookings/:id"
+              element={
+                <BookingDetail
+                  venues={data.venues}
+                  clients={data.clients}
+                  onChanged={() => refresh(true)}
+                />
+              }
+            />
+            <Route
+              path="/schedule"
+              element={
+                <Schedule
+                  venues={data.venues}
+                  revision={data.bookings}
+                  today={data.dashboard.today}
+                />
+              }
+            />
             <Route
               path="*"
               element={

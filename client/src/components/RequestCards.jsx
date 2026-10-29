@@ -44,7 +44,11 @@ export function RequestCards({ bookings }) {
               </dd>
             </div>
             <div>
-              <dt>Hall allocation</dt>
+              <dt>
+                {booking.status === "CANCELLED"
+                  ? "Previous allocation (released)"
+                  : "Hall allocation"}
+              </dt>
               <dd>
                 {booking.hallName
                   ? `${booking.allocatedVenueName} · ${booking.hallName}`

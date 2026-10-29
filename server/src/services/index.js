@@ -1,9 +1,19 @@
+import { lifecycle } from "./lifecycle.js";
+import { venueNow } from "../utils/venueClock.js";
 import { allocate } from "./scheduler.js";
 import { AppError, invalid } from "../utils/errors.js";
-import { bodyObject, integer, text, statuses } from "../utils/validation.js";
+import {
+  bodyObject,
+  integer,
+  text,
+  statuses,
+  idParam,
+} from "../utils/validation.js";
 import { reservationInterval, validateDate } from "../utils/time.js";
 export function createService(repo) {
   return {
+    ...lifecycle(repo, normalizeBooking),
+    dashboard: () => repo.readTransaction(() => repo.dashboard(venueNow())),
     health() {
       repo.health();
       return { status: "ok", database: "ok" };
@@ -70,7 +80,9 @@ export function createService(repo) {
       const status = query.status;
       if (status !== undefined && !statuses.includes(status))
         invalid(`Status must be one of: ${statuses.join(", ")}.`);
-      return repo.bookings({ date, status });
+      const venueId =
+        query.venueId === undefined ? undefined : idParam(query.venueId);
+      return repo.bookings({ date, status, venueId });
     },
     booking(id) {
       const record = repo.booking(id);

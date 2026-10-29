@@ -1,10 +1,11 @@
+import LifecycleActions from "../components/LifecycleActions.jsx";
 import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { api } from "../services/api.js";
 import { formatMinute } from "../utils/time.js";
 import { Feedback, PageTitle } from "../components/Common.jsx";
 import { RequestCards } from "../components/RequestCards.jsx";
-export default function BookingDetail() {
+export default function BookingDetail({ venues, clients, onChanged }) {
   const { id } = useParams();
   const [state, setState] = useState({ loading: true });
   useEffect(() => {
@@ -42,14 +43,39 @@ export default function BookingDetail() {
       ) : (
         <>
           <RequestCards bookings={[state.booking]} />
+          <p className="muted">
+            Created: {state.booking.createdAt} · Updated:{" "}
+            {state.booking.updatedAt}
+          </p>
+          <p className="muted">
+            Client contact:{" "}
+            {clients.find((c) => c.id === state.booking.clientId)?.email ||
+              "No email"}{" "}
+            ·{" "}
+            {clients.find((c) => c.id === state.booking.clientId)?.phone ||
+              "No phone"}
+          </p>
           <div className="notice">
-            <strong>Reserved interval:</strong>{" "}
+            <strong>
+              {state.booking.status === "CONFIRMED"
+                ? "Reserved interval:"
+                : "Requested / historical interval (not reserved):"}
+            </strong>{" "}
             {formatMinute(state.booking.reservedStartMinute)} –{" "}
             {formatMinute(state.booking.reservedEndMinute)} (includes setup and
             cleanup).
             {state.booking.status === "PENDING" &&
               " This request is awaiting allocation and is not confirmed."}
           </div>
+          <LifecycleActions
+            key={id}
+            booking={state.booking}
+            venues={venues}
+            onChanged={async (booking) => {
+              setState({ booking });
+              await onChanged();
+            }}
+          />
         </>
       )}
     </>

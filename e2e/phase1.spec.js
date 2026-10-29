@@ -123,7 +123,9 @@ test("real UI client → confirmed booking → detail → restart persistence; d
   await page.getByLabel("End time").fill("12:00");
   await page.getByRole("button", { name: "Submit event request" }).click();
   await expect(page).toHaveURL("/bookings");
-  await expect(page.getByRole("status")).toContainText("confirmed:");
+  await expect(
+    page.getByRole("status").filter({ hasText: "confirmed:" }),
+  ).toContainText("confirmed:");
   await expect(
     page.getByRole("heading", { name: "Campus Innovation Day" }),
   ).toBeVisible();
@@ -219,4 +221,101 @@ test("UI displays persisted rejection reasons", async ({ page }) => {
   await expect(
     page.locator(".request-card").filter({ hasText: "Too large" }),
   ).toContainText("Not allocated");
+});
+
+test("full lifecycle: reschedule, preserve failed proposal, schedule and dashboard refresh, cancellation confirmation", async ({
+  page,
+}) => {
+  await page.goto("/clients");
+  await page.getByLabel("Client name").fill("Lifecycle browser client");
+  await page.getByRole("button", { name: "Add client", exact: true }).click();
+  await expect(
+    page.getByRole("heading", { name: "Lifecycle browser client" }),
+  ).toBeVisible();
+  await page.getByRole("link", { name: "Create request" }).click();
+  await page
+    .getByLabel("Client", { exact: true })
+    .selectOption({ label: "Lifecycle browser client" });
+  await page.getByLabel("Event name").fill("Lifecycle browser event");
+  await page.getByLabel("Event date").fill("2099-04-01");
+  await page.getByLabel("Start time").fill("10:00");
+  await page.getByLabel("End time").fill("12:00");
+  await page.getByLabel("Attendees").fill("120");
+  await page.getByLabel("Preferred venue").selectOption({ label: "Venue A" });
+  await page.getByRole("button", { name: "Submit event request" }).click();
+  await page.getByRole("link", { name: "Lifecycle browser event" }).click();
+  await expect(
+    page.getByText("Venue A · Hall A2", { exact: true }),
+  ).toBeVisible();
+  await page
+    .getByRole("button", { name: "Reschedule booking", exact: true })
+    .click();
+  await expect(page.getByLabel("Event date")).toHaveValue("2099-04-01");
+  await page.getByLabel("Event date").fill("2099-04-02");
+  await page.getByLabel("Preferred venue").selectOption({ label: "Venue B" });
+  await page.getByRole("button", { name: "Save reschedule" }).click();
+  await expect(
+    page.getByText("Venue B · Hall B2", { exact: true }),
+  ).toBeVisible();
+  await expect(page.getByRole("status")).toContainText("Booking rescheduled");
+  await page
+    .getByRole("button", { name: "Reschedule booking", exact: true })
+    .click();
+  await page.getByLabel("Attendees").fill("999");
+  await page.getByRole("button", { name: "Save reschedule" }).click();
+  await expect(page.getByRole("alert")).toContainText(
+    "original booking is unchanged",
+  );
+  await expect(
+    page.getByText("Venue B · Hall B2", { exact: true }),
+  ).toBeVisible();
+  await expect(page.getByLabel("Attendees")).toHaveValue("999");
+  await page.getByRole("button", { name: "Discard changes" }).click();
+  await page.getByRole("link", { name: "Schedule", exact: true }).click();
+  await page.getByLabel("Schedule date").fill("2099-04-01");
+  await expect(
+    page.getByRole("link", { name: "Lifecycle browser event" }),
+  ).toHaveCount(0);
+  await page.getByLabel("Schedule date").fill("2099-04-02");
+  await expect(
+    page.getByRole("link", { name: "Lifecycle browser event" }),
+  ).toBeVisible();
+  await expect(page.getByText("Hall B2 · 10:00 – 12:00")).toBeVisible();
+  await page.getByRole("link", { name: "Lifecycle browser event" }).click();
+  await page
+    .getByRole("button", { name: "Cancel booking", exact: true })
+    .click();
+  await page.getByRole("button", { name: "Keep booking" }).click();
+  await expect(
+    page.locator(".badge").filter({ hasText: "Confirmed" }),
+  ).toBeVisible();
+  await page
+    .getByRole("button", { name: "Cancel booking", exact: true })
+    .click();
+  await page.getByRole("button", { name: "Confirm cancellation" }).click();
+  await expect(
+    page.locator(".badge").filter({ hasText: "Cancelled" }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Cancel booking", exact: true }),
+  ).toHaveCount(0);
+  await page.reload();
+  await expect(
+    page.locator(".badge").filter({ hasText: "Cancelled" }),
+  ).toBeVisible();
+  await page.getByRole("link", { name: "Schedule", exact: true }).click();
+  await page.getByLabel("Schedule date").fill("2099-04-02");
+  await expect(
+    page.getByRole("heading", { name: "No confirmed events" }),
+  ).toBeVisible();
+  await page.getByRole("link", { name: "Overview", exact: true }).click();
+  await expect(
+    page.locator(".stat").filter({ hasText: "Cancelled" }).locator("strong"),
+  ).toHaveText("1");
+  await page.setViewportSize({ width: 390, height: 844 });
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= innerWidth,
+    ),
+  ).toBe(true);
 });
