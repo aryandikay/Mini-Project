@@ -1,12 +1,102 @@
-# EventSync — Phase 3
+# EventSync — Phase 5
 
-A local event-request workspace for clients, campus venues, and automatically allocated bookings. React + Vite + Tailwind CSS, Express 5, and SQLite via better-sqlite3. No external accounts or paid services are needed.
+EventSync is a local campus event-planning workspace that allocates halls and shared equipment, explains conflicts, recommends alternative arrangements, and lets managers inspect resources and simulate changes before committing them.
 
-New requests are automatically **CONFIRMED** with a venue/hall or **REJECTED** with constraint explanations. Capacity, buffered hall conflicts and peak shared-resource usage are checked atomically. Historical Phase 1 pending requests remain unchanged. Confirmed bookings can now be cancelled or rescheduled from their details page. Failed rescheduling preserves the original reservation. See [lifecycle design](docs/LIFECYCLE.md) and [scheduling design](docs/SCHEDULING.md).
+## Problem and scope
 
-## Quick start
+Multiple clients compete for halls, projectors, audio systems and support staff. A hall can be free while its venue's shared equipment is exhausted. Setup and cleanup also reserve capacity. EventSync evaluates those constraints together and preserves historical booking records.
 
-Use Node.js **22.13 or newer** (tested on 24.19.0) and npm. Run from the repository root:
+The separate official problem-statement PDF was unavailable. The rules below follow the supplied implementation prompts; full compliance with an inaccessible document is not claimed. This is a controlled local prototype with no authentication.
+
+## Features
+
+- Client management and the official three-venue/six-hall directory.
+- Automatic confirmation or persisted rejection with constraint explanations.
+- Atomic cancellation and rescheduling, including preservation after failed proposals.
+- Daily schedule, lifecycle counts, upcoming events and request filters.
+- Ranked alternative time/date/venue recommendations with explicit confirmation.
+- Resource intelligence by venue/date, concurrent usage inspection, peak/full-use intervals, and hall/resource timelines.
+- Read-only what-if simulation for new events and confirmed-booking changes, with original/proposed comparison and a separate protected apply action.
+- Deterministic, isolated demonstration data and automated database/API/browser tests.
+
+## Allocation constraints and algorithm
+
+| Venue | Halls and capacity | Projectors | Audio systems | Staff |
+| --- | --- | --- | --- | --- |
+| Venue A | A1: 60; A2: 150 | 2 | 2 | 5 |
+| Venue B | B1: 100; B2: 200 | 2 | 1 | 4 |
+| Venue C | C1: 80; C2: 250 | 3 | 2 | 6 |
+
+Operating hours are 08:00–22:00. Each event reserves 30 minutes before and after execution, so events must fit 08:30–21:30 on one date with positive duration. Attendance and resource quantities are validated integers. Past dates are allowed by the supplied requirements.
+
+Reservation intervals are half-open: `[start, end)`. A reservation ending at 12:30 can be followed by one beginning at 12:30 without overlap. Bookings use their complete buffered interval for hall and shared-resource checks.
+
+The pure `allocate()` evaluator tries the preferred venue first and chooses its smallest free hall that seats the attendees, provided venue-wide resources remain feasible throughout the interval. Otherwise it evaluates other venues, with capacity, venue-ID and hall-ID tie breaks. Resources are counted by a boundary sweep: aggregate simultaneous starts/ends, then measure the following segment. Disjoint reservations are not incorrectly summed as concurrent demand.
+
+Creation rechecks current reservations inside a SQLite immediate transaction. Feasible requests become CONFIRMED; infeasible normal submissions persist as REJECTED without reserving resources. Only CONFIRMED rows consume capacity. Cancellation retains historical allocation but releases it. Rescheduling excludes itself, checks a proposal and commits atomically; an infeasible proposal leaves all original fields unchanged. The UI sends `expectedUpdatedAt` to reject stale edits.
+
+## Recommendations
+
+The engine evaluates a bounded grid plus the exact requested clock time, using the same allocator. Duration, attendance and resources stay unchanged. Defaults are a 15-minute grid, original date only and five results; the API supports up to seven dates and 20 results. Ranking prioritizes preferred venue, original date, absolute clock-time difference, hall capacity and stable IDs/date/time.
+
+Previews are provisional, not reservations. Selected confirmation uses the existing booking endpoint, revalidates current availability and requires the chosen venue. A different venue is never silently substituted. Creation retries use persisted confirmation keys; same key/input returns the same current booking, different input returns a conflict, and failed transactions leave no orphaned key. Keys do not expire in this prototype. Details: [Phase 4 report and contract](docs/PHASE4.md).
+
+## Resource intelligence and timeline
+
+Open **Resources**, select date/venue, and inspect a time within 08:00–22:00. The API returns confirmed bookings scoped to that venue/date, a full-day usage sweep, inventory, daily peaks, peak intervals and full-use intervals. At the inspection time, the UI looks up the corresponding backend segment and shows used/available units. At 22:00 the operating window is closed and usage is zero.
+
+No ambiguous utilization percentages are displayed. Peak means the maximum simultaneous unit demand over the operating window; instantaneous usage means demand in the selected half-open segment. Idle resources have no peak-demand intervals, and zero inventory is not labeled fully utilized. Inconsistent persisted over-capacity demand is exposed rather than silently clamped.
+
+All hall and resource rows share the same time scale. Light reservation ends show setup/cleanup and solid centers show execution. Booking bars and the accompanying reservation list open actual details. Small screens scroll within the timeline rather than overflowing the page.
+
+## What-if simulator
+
+Open **What-if** or choose **Explore a what-if change** from a confirmed booking. New hypothetical requests need scheduling requirements only. Existing-booking simulations fetch fresh details, require the current concurrency token and exclude only that validated CONFIRMED record. Change date, time, attendance, resources or preferred venue and select **Simulate proposal**.
+
+The response compares original/proposed intervals and allocations, explains infeasibility or preferred-venue fallback, and lists overlapping preferred-venue reservations without claiming every overlap blocks the request. Simulation performs no inserts, updates, cancellations or confirmation-key writes.
+
+A feasible preview can be applied separately: select a client/name for a new booking or apply the existing booking's reschedule. Both use existing protected endpoints, recheck current availability and require the simulated venue. The scheduler may choose another suitable hall within that venue if state has changed. Stale tokens or unavailable selections produce errors and preserve the original booking. Reload original inputs or rerun the simulation to recover.
+
+## Stack and architecture
+
+Node.js >=22.13, npm workspaces, React 19.2, React Router 7, Vite 7, Tailwind CSS 4, Express 5, better-sqlite3 12.4 and Playwright 1.56. No external services or new charting dependencies are required.
+
+- `client/src/pages/`: overview, clients, request creation/list/details, daily schedule, resources and simulation.
+- `client/src/components/`: shared forms/feedback, lifecycle actions, recommendations and SVG timelines.
+- `client/src/services/api.js`: centralized success/error decoding and same-origin HTTP calls.
+- `server/src/routes/` and `controllers/`: thin HTTP handling.
+- `server/src/services/`: validation, scheduling, shared resource sweep, recommendations, analytics, simulation and transaction ownership.
+- `server/src/repositories/`: parameterized SQL and response mapping.
+- `server/src/db/`: schema, connections, additive initialization and official data seeding.
+- `server/tests/`, `e2e/`: isolated database/API/concurrency and real-browser verification.
+
+SQLite stores clients, venues, halls, bookings and recommendation confirmation keys. Foreign keys, status/interval/type checks and date/status/hall/venue indexes are enabled. WAL and a five-second busy timeout are configured. Resource usage is derived, never stored as mutable counters. Startup creates missing schema and upserts official inventory; it never deletes clients or bookings. Manual inventory edits are reasserted to the official dataset at startup.
+
+## Main API endpoints
+
+All successful results use `{data: ...}`; failures use `{error: {code, message, details?}}`.
+
+| Endpoint | Purpose |
+| --- | --- |
+| `GET /api/health` | SQLite health check |
+| `GET/POST /api/clients` | List/create clients |
+| `GET /api/venues` | Venues, halls and shared inventory |
+| `GET/POST /api/bookings` | Filter/list or create requests |
+| `GET /api/bookings/:id` | Persisted details |
+| `PATCH /api/bookings/:id/cancel` | Cancel confirmed booking |
+| `PATCH /api/bookings/:id/reschedule` | Atomic rescheduling |
+| `GET /api/dashboard` | Counts and upcoming events |
+| `POST /api/availability/check` | Existing availability preview |
+| `POST /api/recommendations` | Read-only alternatives |
+| `POST /api/bookings/:id/recommendations` | Trusted reschedule alternatives |
+| `GET /api/analytics/resources?venueId=1&date=2030-03-20` | Venue/date resource intelligence |
+| `POST /api/simulation` | Read-only new/existing what-if evaluation |
+
+Exact contracts: [API documentation](docs/API.md), [Phase 4](docs/PHASE4.md), [Phase 5](docs/PHASE5.md).
+
+## Installation and development
+
+Use Node.js 22.13 or newer and npm. From the repository root:
 
 ```sh
 npm ci
@@ -14,75 +104,43 @@ npm run db:init
 npm run dev
 ```
 
-The dashboard runs on port 5173 and the API on port 3001. Vite proxies `/api` to Express. `npm run dev` starts both processes; Ctrl+C stops them. Alternatively, run `npm run dev:server` and `npm run dev:client` in separate terminals. Commands work with npm on Windows as well as Linux; native better-sqlite3 builds may require platform build tools if a prebuilt binary is unavailable.
+UI: http://localhost:5173. API: http://localhost:3001/api/health. Vite proxies `/api` to Express. Ctrl+C stops both processes. Alternatively use `npm run dev:server` and `npm run dev:client` in separate terminals. Native SQLite builds may require platform build tools if no prebuilt binary is available.
 
-Optional: copy `.env.example` to `.env`. `PORT` changes the API port; update `API_PROXY_TARGET` to match, then restart both services. `DB_PATH` is resolved relative to `server/` unless absolute; the default is `server/data/eventsync.sqlite`. Database files and `.env` are ignored by Git. No secrets are required. Dates and times represent **venue-local civil time**, without timezone conversion; timestamps use UTC. The venue's geographic timezone was not supplied. `VENUE_TIME_ZONE` defaults to UTC for dashboard time comparisons; set an IANA zone such as `Asia/Kolkata` for the campus. Stored event dates/times are never converted.
+Optionally copy `.env.example` to `.env`. No secrets are needed. Default database: `server/data/eventsync.sqlite`. Relative `DB_PATH` values resolve from `server/`. If changing `PORT`, update `API_PROXY_TARGET` and restart both services. `VENUE_TIME_ZONE` defaults to UTC; this local workspace uses `Asia/Kolkata`. Event dates/times are venue-local civil values and are never timezone-converted; audit timestamps use UTC.
 
-## Use the application
+For a production-style local check, run `npm run build`, then `npm start` and open http://localhost:3001. Express serves the built frontend and React route fallback; unknown API routes remain JSON 404 errors. Rebuild before restarting to pick up frontend changes.
 
-1. View all three venues and their six halls on Overview. Inventory is venue-wide, shared by its halls.
-2. Open Clients and create a client (name required; email and phone optional).
-3. Create an event request. Select the client and preferred venue and fill in event details and resource quantities.
-4. Submit to receive a confirmed allocation or a persisted rejection with explanations. Event requests displays stored requests and supports date/status filters. Click an event name for its database-backed details.
-5. Restart the application or refresh the browser: clients and requests remain in SQLite. The footer's Refresh data action retrieves changes made by other sessions.
+## Commands and verification
 
-Each event includes 30 minutes of setup and 30 minutes of cleanup within 08:00–22:00. Therefore the earliest event start is 08:30 and latest event end is 21:30. Same-day positive durations only; past dates are permitted because the supplied requirements do not prohibit them. No allocation is implied by the venue directory.
+| Command | Purpose |
+| --- | --- |
+| `npm run dev` | Development UI and API |
+| `npm run build` | Production frontend build |
+| `npm start` | API and built frontend |
+| `npm run db:init` / `npm run db:seed` | Non-destructive schema/official seed initialization |
+| `npm test` | Backend, API, database, concurrency and demo tests |
+| `npx playwright install chromium` | Install browser once |
+| `npm run test:e2e` | Real-browser workflows on isolated ports 3101/5174 |
+| `npm run demo:reset` | Explicitly replace only the dedicated demonstration dataset |
+| `npm run demo:dev` | Start development services against the demonstration database |
 
-## Commands
+On managed environments, sockets, workers or browser execution may require permitted execution outside the command sandbox. `PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH` optionally selects an installed Chromium; use your shell's syntax to set it. Test databases are isolated from development/demo records. Latest actual results and limitations are in [Phase 5 report](docs/PHASE5.md).
 
-| Command              | Purpose                                                      |
-| -------------------- | ------------------------------------------------------------ |
-| `npm run dev`        | Start frontend and backend                                   |
-| `npm run dev:client` | Vite development server                                      |
-| `npm run dev:server` | Express with Node watch mode                                 |
-| `npm run db:init`    | Create missing tables and seed official data                 |
-| `npm run db:seed`    | Same idempotent initialization and seeding                   |
-| `npm test`           | Isolated SQLite, time, and HTTP integration tests            |
-| `npm run build`      | Build React into `client/dist`                               |
-| `npm start`          | Express API; also serves built frontend if present           |
-| `npm run test:e2e`   | Real-browser workflow against isolated database and services |
+## Demonstration workflow
 
-For browser tests, install Chromium once with `npx playwright install chromium`. On this prepared cloud machine Chromium is installed at `/usr/bin/chromium`; run `PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH=/usr/bin/chromium npm run test:e2e` on Linux, or set the same variable using your shell's native syntax. Browser tests use ports 3101 and 5174; keep them free. Tests create temporary databases and remove them after completion. Socket/browser restrictions in managed sandboxes may require running test commands with the environment's permitted execution access.
+Stop any running development services, then:
 
-For a local production-mode check, run `npm run build` followed by `npm start` and open port 3001. React routes fall back to `index.html`; unknown `/api` endpoints still return JSON 404 errors. The build is needed before starting Express to enable static serving.
+```sh
+npm run demo:reset
+npm run demo:dev
+```
 
-## Architecture and ownership
+Reset affects only `server/data/eventsync-demo.sqlite`, regardless of `DB_PATH`. It does not reset the normal development database. Do not reset the demo while its server is running. The verified manifest is written to `server/data/demo-manifest.json`.
 
-- `client/src/pages/`: Overview, client management, request submission, request listing and details. Controlled native form inputs, loading/error/empty states and responsive layout.
-- `client/src/components/`: page headings, fields, status/feedback and request presentation.
-- `client/src/services/api.js`: the only frontend HTTP access layer; consistently decodes success/error responses. Same-origin `/api` supports both development proxy and Express static serving.
-- `server/src/routes/` registers endpoints; `controllers/` handles HTTP orchestration; `services/` validates inputs and owns application transactions; `repositories/` owns parameterized SQL and camelCase response mapping.
-- `server/src/utils/time.js`: strict calendar/time parsing, minutes-from-midnight conversion and reservation buffers, reused by the allocation engine.
-- `server/src/db/`: centralized connections, non-destructive schema creation and transactional idempotent official seeding. WAL, foreign keys and busy timeout are enabled. Initialization never deletes clients or requests.
-- `server/src/middleware/`: consistent errors with safe public messages; unexpected details are logged only on the server.
-- `server/tests/` and `e2e/`: database/API/time and real-browser integration tests.
+Open Resources, select **2030-03-20 / Venue A / 10:00** for two occupied halls and peaks of **2 projectors, 2 audio systems and 5 staff**. Open the conference, explore a what-if move and compare results. Inspect rejected history, search alternatives, and demonstrate cancellation or atomic rescheduling. Full reproducible steps for all 13 scenarios: [Demo guide](docs/DEMO.md).
 
-## Database
+## Limitations and delivery status
 
-Four tables: `clients`, `venues`, `halls`, `bookings`. A client has many requests; a venue has many halls and venue-wide resource inventory. Requests reference clients and preferred venues. Nullable allocated venue/hall fields support future scheduling, with a composite foreign key preventing hall/venue mismatches. States are `PENDING`, `CONFIRMED`, `REJECTED`, `CANCELLED`; pending rows cannot have allocation and confirmed rows must have it. Numeric, interval, status and relationship constraints are enforced in SQLite, with stricter calendar/type validation in the service layer. Indexes cover date, status, hall/date/interval and allocated venue/date/interval.
+The official PDF was unavailable. Authentication, payments, waitlists, cloud infrastructure and subsequent phases are not implemented. The servers bind to all interfaces; use a controlled local network. No comprehensive security audit, production load test or production-scale claim is made.
 
-Booking rows store event date, integer event and reserved start/end minutes, attendees, requested resources, allocation fields, status, optional rejection reason, and creation/update timestamps. Inventory is never duplicated onto halls and no mutable utilization counter is stored. Future lifecycle services must update `updated_at` explicitly; Phase 3 exposes guarded lifecycle updates but no delete endpoint. Startup additively migrates `reason_details` for structured rejection explanations without changing historical rows. Future schema changes require deliberate non-destructive migrations.
-
-| Venue   | Halls and capacities       | Projectors | Audio systems | Support staff |
-| ------- | -------------------------- | ---------- | ------------- | ------------- |
-| Venue A | Hall A1: 60; Hall A2: 150  | 2          | 2             | 5             |
-| Venue B | Hall B1: 100; Hall B2: 200 | 2          | 1             | 4             |
-| Venue C | Hall C1: 80; Hall C2: 250  | 3          | 2             | 6             |
-
-Seeding upserts this fixed inventory and hall capacities by stable unique names, preserving IDs and all clients/requests. Startup reasserts the supplied official data. Database contents persist on disk across restarts; back up the database appropriately before future migrations.
-
-## API contract
-
-See [docs/API.md](docs/API.md) for exact requests, fields, response shapes and errors. All endpoints are database-backed; no fake booking records are shipped.
-
-## Scope, assumptions and handoff
-
-The Phase 1 and Phase 2 implementation prompts were accessible. The separately referenced official problem statement and research reports remain unavailable. Rules and sample scenarios follow the supplied prompts. Equal choices use capacity, venue ID, then hall ID; this is a documented implementation assumption.
-
-Cancellation and atomic rescheduling are implemented. Recommendations remain deferred. No authentication is implemented; this is a local college prototype. See [lifecycle design and Phase 4 handoff](docs/LIFECYCLE.md) for transaction ownership, complexity and extension points.
-
-## Manage bookings
-
-Open a confirmed booking's details to reschedule or cancel it. Cancellation asks for confirmation and retains historical allocation details labeled as released. Rescheduling prefills current scheduling fields; failed proposals keep those entries for correction and leave the original booking visible. Only confirmed records expose lifecycle actions.
-
-The daily Schedule view lists confirmed events for a selected date, grouped by venue, with event and buffered intervals. Booking lists filter by date, status and allocated venue. The dashboard uses `/api/dashboard` for all lifecycle counts and the next ten confirmed events. Successful mutations refetch shared data; other browser sessions can use Refresh data to retrieve changes.
+Recommendation search is bounded and may miss unsampled minutes. Simulations and analytics are snapshots, not live reservations. General client/booking lists remain unpaginated. Confirmation keys have no expiry. Windows was verified locally; other platforms were not reverified for Phase 5. Historical reports remain available in `docs/` and describe their respective implementation stages.

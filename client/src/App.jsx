@@ -1,4 +1,6 @@
 import Schedule from "./pages/Schedule.jsx";
+import Resources from "./pages/Resources.jsx";
+import Simulation from "./pages/Simulation.jsx";
 import { useCallback, useEffect, useState } from "react";
 import { Link, NavLink, Route, Routes } from "react-router-dom";
 import { api } from "./services/api.js";
@@ -55,6 +57,8 @@ export default function App() {
           <NavLink to="/bookings">Event requests</NavLink>
           <NavLink to="/schedule">Schedule</NavLink>
           <NavLink to="/clients">Clients</NavLink>
+          <NavLink to="/resources">Resources</NavLink>
+          <NavLink to="/simulation">What-if</NavLink>
         </nav>
         <Link to="/new" className="header-action">
           Create request <span aria-hidden="true">→</span>
@@ -65,7 +69,7 @@ export default function App() {
           <i /> EventSync workspace
         </span>
         <span>
-          PHASE 3 <b>·</b> REQUEST MANAGEMENT
+          PHASE 5 <b>·</b> RESOURCE INTELLIGENCE
         </span>
       </div>
       <main id="main">
@@ -83,6 +87,9 @@ export default function App() {
           </div>
         ) : (
           <Routes>
+            <Route path="/resources" element={<Resources venues={data.venues} today={data.dashboard.today} revision={data.bookings} />} />
+            <Route path="/simulation" element={<Simulation venues={data.venues} clients={data.clients} bookings={data.bookings}
+              today={data.dashboard.today} onApplied={() => refresh(true)} />} />
             <Route path="/" element={<Dashboard {...data} />} />
             <Route
               path="/clients"

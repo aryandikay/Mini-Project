@@ -290,6 +290,13 @@ async function race(t, path, jobs) {
         });
       }),
   );
+  // A result message can arrive before the worker closes its SQLite handle.
+  const exits = workers.map(
+    (w) => new Promise((resolve, reject) => {
+      w.once("error", reject);
+      w.once("exit", (code) => code === 0 ? resolve() : reject(new Error(`Worker exited with code ${code}`)));
+    }),
+  );
   await Promise.all(
     workers.map(
       (w) =>
@@ -301,7 +308,9 @@ async function race(t, path, jobs) {
   );
   Atomics.store(flag, 0, 1);
   Atomics.notify(flag, 0, workers.length);
-  return Promise.all(results);
+  const completed = await Promise.all(results);
+  await Promise.all(exits);
+  return completed;
 }
 for (const scenario of [
   "reschedule/new",
@@ -310,9 +319,10 @@ for (const scenario of [
 ])
   test(`concurrent ${scenario} serializes safely`, async (t) => {
     const dir = mkdtempSync(join(tmpdir(), "eventsync-race-"));
-    t.after(() => rmSync(dir, { recursive: true, force: true }));
     const path = join(dir, "db.sqlite");
     const { service } = setup(t, path);
+    // Hooks run in registration order: close the database before deleting it.
+    t.after(() => rmSync(dir, { recursive: true, force: true }));
     const a = service.createBooking({ ...input, attendees: 250 }),
       b = service.createBooking({
         ...input,
@@ -363,9 +373,9 @@ for (const scenario of [
   });
 test("concurrent stale reschedules of the same booking cannot silently overwrite", async (t) => {
   const dir = mkdtempSync(join(tmpdir(), "eventsync-stale-"));
-  t.after(() => rmSync(dir, { recursive: true, force: true }));
   const path = join(dir, "db.sqlite");
   const { service } = setup(t, path);
+  t.after(() => rmSync(dir, { recursive: true, force: true }));
   const a = service.createBooking(input);
   const results = await race(
     t,

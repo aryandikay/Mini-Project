@@ -1,12 +1,14 @@
 import LifecycleActions from "../components/LifecycleActions.jsx";
+import Recommendations from "../components/Recommendations.jsx";
 import { useEffect, useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams } from "react-router-dom";
 import { api } from "../services/api.js";
 import { formatMinute } from "../utils/time.js";
 import { Feedback, PageTitle } from "../components/Common.jsx";
 import { RequestCards } from "../components/RequestCards.jsx";
 export default function BookingDetail({ venues, clients, onChanged }) {
   const { id } = useParams();
+  const navigate = useNavigate();
   const [state, setState] = useState({ loading: true });
   useEffect(() => {
     let active = true;
@@ -42,7 +44,7 @@ export default function BookingDetail({ venues, clients, onChanged }) {
         <Feedback error={state.error} />
       ) : (
         <>
-          <RequestCards bookings={[state.booking]} />
+          <RequestCards bookings={[state.booking]} showAlternativeAction={false} />
           <p className="muted">
             Created: {state.booking.createdAt} · Updated:{" "}
             {state.booking.updatedAt}
@@ -76,6 +78,12 @@ export default function BookingDetail({ venues, clients, onChanged }) {
               await onChanged();
             }}
           />
+          {state.booking.status === "CONFIRMED" && <p><Link className="button secondary" to={`/simulation?bookingId=${state.booking.id}`}>Explore a what-if change</Link></p>}
+          {state.booking.status === "REJECTED" && <Recommendations key={id} original={state.booking}
+            onConfirmed={async (booking) => {
+              await onChanged();
+              navigate(`/bookings/${booking.id}`);
+            }} />}
         </>
       )}
     </>

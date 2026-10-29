@@ -25,6 +25,10 @@ export default function Dashboard({ venues, bookings, dashboard }) {
       >
         Your venues, people and event requests, together in one place.
       </PageTitle>
+      <section className="planning-tools" aria-label="Planning tools">
+        <Link className="panel" to="/resources"><h2>Resource intelligence & timeline →</h2><p>Inspect hall reservations and shared-resource demand by venue and date.</p></Link>
+        <Link className="panel" to="/simulation"><h2>What-if simulator →</h2><p>Compare proposed arrangements without changing bookings.</p></Link>
+      </section>
       <section className="stats" aria-label="Campus and request statistics">
         {stats.map(([label, value, caption], i) => (
           <article className="stat" key={label}>

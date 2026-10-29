@@ -49,3 +49,8 @@ CREATE INDEX IF NOT EXISTS bookings_date ON bookings(event_date);
 CREATE INDEX IF NOT EXISTS bookings_status ON bookings(status);
 CREATE INDEX IF NOT EXISTS bookings_hall_interval ON bookings(hall_id, event_date, reserved_start_minute, reserved_end_minute);
 CREATE INDEX IF NOT EXISTS bookings_venue_interval ON bookings(allocated_venue_id, event_date, reserved_start_minute, reserved_end_minute);
+CREATE TABLE IF NOT EXISTS recommendation_confirmations (
+  confirmation_key TEXT PRIMARY KEY,
+  request_fingerprint TEXT NOT NULL,
+  booking_id INTEGER NOT NULL REFERENCES bookings(id)
+);

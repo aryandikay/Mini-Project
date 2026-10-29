@@ -1,6 +1,8 @@
 import { allocate } from "./scheduler.js";
+import { findRecommendations, searchOptions } from "./recommendations.js";
+import { selectedVenue, requireSelectedVenue } from "./selection.js";
 import { AppError, invalid } from "../utils/errors.js";
-import { bodyObject } from "../utils/validation.js";
+import { bodyObject, text } from "../utils/validation.js";
 const fields = [
   "eventDate",
   "startTime",
@@ -11,7 +13,7 @@ const fields = [
   "audioRequired",
   "staffRequired",
 ];
-function confirmed(repo, id, expectedUpdatedAt) {
+export function confirmed(repo, id, expectedUpdatedAt) {
   const booking = repo.booking(id);
   if (!booking) throw new AppError(404, "NOT_FOUND", "Booking not found.");
   if (booking.status !== "CONFIRMED")
@@ -46,6 +48,18 @@ function checkedWrite(result) {
 }
 export function lifecycle(repo, normalize) {
   return {
+    rescheduleRecommendations(id, body) {
+      bodyObject(body);
+      if (Object.keys(body).some((key) => !fields.includes(key) && !["expectedUpdatedAt", "search"].includes(key)))
+        invalid("Unknown rescheduling recommendation field.");
+      text(body.expectedUpdatedAt, "expectedUpdatedAt", 40);
+      const options = searchOptions(body.search);
+      return repo.readTransaction(() => {
+        const original = confirmed(repo, id, body.expectedUpdatedAt);
+        const changes = Object.fromEntries(fields.filter((key) => Object.hasOwn(body, key)).map((key) => [key, body[key]]));
+        return findRecommendations(repo, normalize({ ...original, ...changes }), options, id);
+      });
+    },
     cancelBooking(id, body = {}) {
       bodyObject(body);
       if (Object.keys(body).some((key) => key !== "expectedUpdatedAt"))
@@ -62,11 +76,11 @@ export function lifecycle(repo, normalize) {
       bodyObject(body);
       if (
         Object.keys(body).some(
-          (key) => !fields.includes(key) && key !== "expectedUpdatedAt",
+          (key) => !fields.includes(key) && !["expectedUpdatedAt", "selectedVenueId"].includes(key),
         )
       )
         invalid(
-          "Rescheduling accepts scheduling fields and expectedUpdatedAt only.",
+          "Rescheduling accepts scheduling fields, expectedUpdatedAt and selectedVenueId only.",
         );
       if (!fields.some((key) => Object.hasOwn(body, key)))
         invalid("Provide at least one scheduling change.");
@@ -78,13 +92,15 @@ export function lifecycle(repo, normalize) {
             .map((key) => [key, body[key]]),
         );
         const input = normalize({ ...original, ...changes });
+        const venueId = selectedVenue(body.selectedVenueId, input.preferredVenueId);
         if (!repo.venue(input.preferredVenueId))
           invalid("Selected venue does not exist.");
         const decision = allocate(
           input,
-          repo.venues(),
+          repo.venues().filter((v) => venueId === undefined || v.id === venueId),
           repo.reservations(input, id),
         );
+        requireSelectedVenue(decision, venueId);
         if (!decision.feasible) {
           const error = new AppError(
             409,

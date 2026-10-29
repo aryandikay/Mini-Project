@@ -19,7 +19,9 @@
     "start": "npm start -w server",
     "db:init": "npm run db:init -w server",
     "db:seed": "npm run db:seed -w server",
-    "test:e2e": "playwright test"
+    "test:e2e": "playwright test",
+    "demo:reset": "node scripts/demo.js --reset",
+    "demo:dev": "node scripts/demo-dev.js"
   },
   "devDependencies": {
     "@playwright/test": "1.56.1"

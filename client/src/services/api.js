@@ -31,6 +31,12 @@ async function request(path, options) {
   return payload.data;
 }
 export const api = {
+  resources: (filters) => request(`/analytics/resources?${new URLSearchParams(filters)}`),
+  simulate: (body) => request("/simulation", { method: "POST", body: JSON.stringify(body) }),
+  recommendations: (body) => request("/recommendations", { method: "POST", body: JSON.stringify(body) }),
+  rescheduleRecommendations: (id, body) => request(`/bookings/${id}/recommendations`, {
+    method: "POST", body: JSON.stringify(body),
+  }),
   dashboard: () => request("/dashboard"),
   cancel: (id, expectedUpdatedAt) =>
     request(`/bookings/${id}/cancel`, {

@@ -1,6 +1,6 @@
 import { Link } from "react-router-dom";
 import { Status } from "./Common.jsx";
-export function RequestCards({ bookings }) {
+export function RequestCards({ bookings, showAlternativeAction = true }) {
   return (
     <div className="request-list">
       {bookings.map((booking) => (
@@ -59,6 +59,9 @@ export function RequestCards({ bookings }) {
           {booking.rejectionReason && (
             <p className="notice error">{booking.rejectionReason}</p>
           )}
+          {showAlternativeAction && booking.status === "REJECTED" && <Link className="button secondary" to={`/bookings/${booking.id}`}>
+            Find alternatives
+          </Link>}
         </article>
       ))}
     </div>

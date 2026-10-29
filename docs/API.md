@@ -139,3 +139,17 @@ The reasons above illustrate one venue; actual responses contain all computed fa
 `GET /bookings?date=2099-01-01&status=CONFIRMED&venueId=1` combines optional exact filters. Venue filtering uses allocated venue, including historical allocations on cancelled records; unallocated pending/rejected records do not match a venue. Ordering remains newest ID first.
 
 `GET /dashboard` returns `{ data: { counts: { PENDING, CONFIRMED, REJECTED, CANCELLED }, totalBookings, totalVenues, totalHalls, upcoming, today, timeZone } }`. Counts come from all persisted records. `upcoming` contains up to ten confirmed bookings ordered by date, start minute, ID whose start is at or after the current venue-local minute. `VENUE_TIME_ZONE` defaults to UTC and accepts an IANA timezone. This is a documented default, not an inferred campus location. Invalid timezone configuration causes a safe server error; correct it and restart.
+# Phase 4 additions
+
+`POST /api/recommendations` returns a read-only snapshot of ranked alternative slots.
+`POST /api/bookings/:id/recommendations` previews a confirmed booking's proposed reschedule with a required current `expectedUpdatedAt` token. Only that validated booking is excluded.
+
+Creation via `POST /api/bookings` additionally accepts `selectedVenueId` and `confirmationKey` for strict, idempotent alternative confirmation. `PATCH /api/bookings/:id/reschedule` accepts `selectedVenueId` for strict venue selection. Existing request/response contracts remain compatible. Full schemas, examples, search bounds and errors: [Phase 4 API contract](PHASE4.md#api-contract).
+
+## Phase 5 additions
+
+`GET /api/analytics/resources?venueId=1&date=2030-03-20` returns confirmed venue/date reservations, hall occupancy, exact concurrent usage segments and per-resource inventory, peak and fully utilized intervals. A malformed query returns 400; unknown venue returns 404.
+
+`POST /api/simulation` accepts `{proposal: {...schedulingFields}}` for a new hypothetical event, or `{bookingId, expectedUpdatedAt, proposal: {...partialSchedulingFields}}` for a confirmed booking. It returns `{data: {provisional: true, original, proposal, feasible, allocation, preferredVenueReasons, changes, overlappingReservations, message}}` without writing records. Unknown booking returns 404, stale/non-confirmed context returns 409, and malformed input returns 400. Failures to read the database retain the existing safe 500 envelope.
+
+Simulation does not apply changes. Apply via the existing creation/rescheduling endpoints with strict `selectedVenueId`, creation `confirmationKey` or rescheduling `expectedUpdatedAt` as appropriate. Complete field definitions, read-only guarantees and examples: [Phase 5 report](PHASE5.md#api-contracts).

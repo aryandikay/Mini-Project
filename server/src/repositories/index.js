@@ -77,6 +77,17 @@ export function createRepository(db) {
     },
     booking: (id) =>
       bookingRow(db.prepare(`${bookingSelect} WHERE b.id=?`).get(id)),
+    confirmation: (key) => camelRow(db.prepare(
+      "SELECT * FROM recommendation_confirmations WHERE confirmation_key=?",
+    ).get(key)),
+    saveConfirmation: (key, fingerprint, bookingId) => db.prepare(
+      "INSERT INTO recommendation_confirmations(confirmation_key,request_fingerprint,booking_id) VALUES(?,?,?)",
+    ).run(key, fingerprint, bookingId),
+    reservationsBetween(fromDate, throughDate, excludeBookingId = null) {
+      return db.prepare(`SELECT * FROM bookings WHERE status='CONFIRMED'
+        AND event_date BETWEEN ? AND ? AND (? IS NULL OR id != ?)`)
+        .all(fromDate, throughDate, excludeBookingId, excludeBookingId).map(camelRow);
+    },
     reservations(input, excludeBookingId = null) {
       return db
         .prepare(

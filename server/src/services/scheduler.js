@@ -1,3 +1,4 @@
+import { resourceSegments, RESOURCE_FIELDS } from "./resourceSweep.js";
 export const STATUS = { CONFIRMED: "CONFIRMED", REJECTED: "REJECTED" };
 export const REASON = {
   CAPACITY: "INSUFFICIENT_HALL_CAPACITY",
@@ -18,37 +19,9 @@ export function overlaps(a, b) {
   );
 }
 export function peakUsage(request, bookings) {
-  const changes = new Map();
-  function boundary(time, booking, sign) {
-    const delta = changes.get(time) || [0, 0, 0];
-    resources.forEach(([field], i) => {
-      delta[i] += sign * booking[field];
-    });
-    changes.set(time, delta);
-  }
-  for (const booking of [request, ...bookings]) {
-    if (!overlaps(request, booking)) continue;
-    boundary(
-      Math.max(request.reservedStartMinute, booking.reservedStartMinute),
-      booking,
-      1,
-    );
-    boundary(
-      Math.min(request.reservedEndMinute, booking.reservedEndMinute),
-      booking,
-      -1,
-    );
-  }
-  const current = [0, 0, 0],
-    peak = [0, 0, 0];
-  // Aggregate simultaneous ends/starts before measuring the following half-open segment.
-  for (const time of [...changes.keys()].sort((a, b) => a - b)) {
-    changes.get(time).forEach((delta, i) => {
-      current[i] += delta;
-      peak[i] = Math.max(peak[i], current[i]);
-    });
-  }
-  return Object.fromEntries(resources.map(([field], i) => [field, peak[i]]));
+  const segments = resourceSegments([request, ...bookings], request.reservedStartMinute, request.reservedEndMinute);
+  return Object.fromEntries(RESOURCE_FIELDS.map(([field]) => [field,
+    segments.reduce((peak, segment) => Math.max(peak, segment.usage[field]), 0)]));
 }
 function evaluateVenue(request, venue, bookings) {
   const relevant = bookings.filter(

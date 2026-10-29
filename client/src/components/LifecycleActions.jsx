@@ -1,4 +1,5 @@
 import { useState } from "react";
+import Recommendations, { schedulingInput } from "./Recommendations.jsx";
 import { api } from "../services/api.js";
 import { Field, Feedback } from "./Common.jsx";
 const numeric = [
@@ -22,7 +23,8 @@ export default function LifecycleActions({ booking, venues, onChanged }) {
     [form, setForm] = useState({}),
     [busy, setBusy] = useState(false),
     [error, setError] = useState(""),
-    [success, setSuccess] = useState("");
+    [success, setSuccess] = useState(""),
+    [failedProposal, setFailedProposal] = useState(null);
   function edit() {
     setForm(
       Object.fromEntries(
@@ -33,6 +35,7 @@ export default function LifecycleActions({ booking, venues, onChanged }) {
       ),
     );
     setMode("edit");
+    setFailedProposal(null);
     setError("");
     setSuccess("");
   }
@@ -41,6 +44,7 @@ export default function LifecycleActions({ booking, venues, onChanged }) {
     setBusy(true);
     setError("");
     setSuccess("");
+    setFailedProposal(null);
     try {
       let result;
       if (mode === "cancel")
@@ -68,6 +72,13 @@ export default function LifecycleActions({ booking, venues, onChanged }) {
           : "Booking rescheduled. The updated allocation is shown above.",
       );
     } catch (e) {
+      if (e.code === "RESCHEDULE_INFEASIBLE") {
+        setFailedProposal({
+          ...schedulingInput(booking), ...form,
+          ...Object.fromEntries(numeric.map((key) => [key, Number(form[key])])),
+          updatedAt: booking.updatedAt,
+        });
+      }
       setError(
         [e.message, ...(e.details?.reasons || []).map((r) => r.message)].join(
           " ",
@@ -77,6 +88,7 @@ export default function LifecycleActions({ booking, venues, onChanged }) {
       setBusy(false);
     }
   }
+  if (booking.status !== "CONFIRMED" && !error && !success) return null;
   return (
     <section
       className="panel"
@@ -151,9 +163,10 @@ export default function LifecycleActions({ booking, venues, onChanged }) {
                       max={type === "time" ? "21:30" : undefined}
                       step={type === "number" ? 1 : undefined}
                       value={form[key]}
-                      onChange={(e) =>
-                        setForm({ ...form, [key]: e.target.value })
-                      }
+                      onChange={(e) => {
+                        setForm({ ...form, [key]: e.target.value });
+                        setFailedProposal(null);
+                      }}
                     />
                   </Field>
                 ))}
@@ -161,9 +174,10 @@ export default function LifecycleActions({ booking, venues, onChanged }) {
                   <select
                     required
                     value={form.preferredVenueId}
-                    onChange={(e) =>
-                      setForm({ ...form, preferredVenueId: e.target.value })
-                    }
+                    onChange={(e) => {
+                      setForm({ ...form, preferredVenueId: e.target.value });
+                      setFailedProposal(null);
+                    }}
                   >
                     {venues.map((v) => (
                       <option key={v.id} value={v.id}>
@@ -188,6 +202,12 @@ export default function LifecycleActions({ booking, venues, onChanged }) {
               </div>
             </form>
           )}
+          {mode === "edit" && failedProposal && <Recommendations
+            key={JSON.stringify(failedProposal)} original={failedProposal} bookingId={booking.id}
+            onConfirmed={async (result) => {
+              await onChanged(result); setMode(""); setError(""); setFailedProposal(null);
+              setSuccess("Booking rescheduled. The updated allocation is shown above.");
+            }} />}
         </>
       )}
     </section>
