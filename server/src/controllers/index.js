@@ -1,6 +1,8 @@
 import { idParam } from "../utils/validation.js";
 export function createControllers(service) {
   return {
+    checkAvailability: (req, res) =>
+      res.json({ data: service.checkAvailability(req.body) }),
     health: (req, res) => res.json({ data: service.health() }),
     clients: (req, res) => res.json({ data: service.clients() }),
     createClient: (req, res) => {

@@ -63,7 +63,11 @@ export default function NewBooking({ clients, venues, onCreated }) {
       onCreated(booking);
       navigate("/bookings", {
         state: {
-          message: `Request #${booking.id} submitted. It is pending allocation and is not a confirmed booking.`,
+          outcome: booking.status,
+          message:
+            booking.status === "CONFIRMED"
+              ? `Booking #${booking.id} confirmed: ${booking.allocatedVenueName} · ${booking.hallName}.`
+              : `Request #${booking.id} rejected. ${booking.rejectionReason}`,
         },
       });
     } catch (e) {
@@ -78,7 +82,8 @@ export default function NewBooking({ clients, venues, onCreated }) {
         eyebrow="LET’S BRING IT TOGETHER"
         title="What are you planning?"
       >
-        Tell us about your event. We’ll save your request for allocation.
+        Tell us about your event. We’ll check availability and return a booking
+        decision.
       </PageTitle>
       <div className="booking-layout">
         <form className="panel booking-form" onSubmit={submit}>
@@ -238,8 +243,8 @@ export default function NewBooking({ clients, venues, onCreated }) {
           <div className="pending-note">
             <strong>A request, then a plan.</strong>
             <p>
-              Submissions stay pending. Hall and resource allocation will be
-              introduced in the next phase.
+              Submission checks halls and shared resources. Feasible requests
+              are confirmed; otherwise we explain why they were rejected.
             </p>
           </div>
         </aside>

@@ -16,7 +16,9 @@ function bookingRow(row) {
     Object.assign(result, {
       startTime: minutesToTime(result.startMinute),
       endTime: minutesToTime(result.endMinute),
+      reasons: JSON.parse(result.reasonDetails || "[]"),
     });
+  if (result) delete result.reasonDetails;
   return result;
 }
 const bookingSelect = `SELECT b.*, c.name AS client_name, v.name AS preferred_venue_name,
@@ -71,15 +73,29 @@ export function createRepository(db) {
     },
     booking: (id) =>
       bookingRow(db.prepare(`${bookingSelect} WHERE b.id=?`).get(id)),
+    reservations(input) {
+      return db
+        .prepare(
+          `SELECT * FROM bookings WHERE status='CONFIRMED' AND event_date=?
+        AND reserved_start_minute < ? AND reserved_end_minute > ?`,
+        )
+        .all(
+          input.eventDate,
+          input.reservedEndMinute,
+          input.reservedStartMinute,
+        )
+        .map(camelRow);
+    },
     createBooking(input) {
       const result = db
         .prepare(
-          `INSERT INTO bookings(client_id,event_name,event_date,start_minute,end_minute,reserved_start_minute,reserved_end_minute,attendees,preferred_venue_id,projectors_required,audio_required,staff_required,status)
-        VALUES(@clientId,@eventName,@eventDate,@startMinute,@endMinute,@reservedStartMinute,@reservedEndMinute,@attendees,@preferredVenueId,@projectorsRequired,@audioRequired,@staffRequired,'PENDING')`,
+          `INSERT INTO bookings(client_id,event_name,event_date,start_minute,end_minute,reserved_start_minute,reserved_end_minute,attendees,preferred_venue_id,projectors_required,audio_required,staff_required,status,allocated_venue_id,hall_id,rejection_reason,reason_details)
+        VALUES(@clientId,@eventName,@eventDate,@startMinute,@endMinute,@reservedStartMinute,@reservedEndMinute,@attendees,@preferredVenueId,@projectorsRequired,@audioRequired,@staffRequired,@status,@allocatedVenueId,@hallId,@rejectionReason,@reasonDetails)`,
         )
         .run(input);
       return this.booking(Number(result.lastInsertRowid));
     },
-    transaction: (fn) => db.transaction(fn)(),
+    transaction: (fn) => db.transaction(fn).immediate(),
+    readTransaction: (fn) => db.transaction(fn)(),
   };
 }

@@ -1,3 +1,4 @@
+import { allocate } from "./scheduler.js";
 import { AppError, invalid } from "../utils/errors.js";
 import { bodyObject, integer, text, statuses } from "../utils/validation.js";
 import { reservationInterval, validateDate } from "../utils/time.js";
@@ -25,24 +26,42 @@ export function createService(repo) {
       return repo.createClient({ name, email, phone });
     },
     createBooking(body) {
-      bodyObject(body);
-      const input = {
-        clientId: integer(body.clientId, "clientId", 1),
-        eventName: text(body.eventName, "Event name", 160),
-        eventDate: validateDate(body.eventDate),
-        ...reservationInterval(body.startTime, body.endTime),
-        attendees: integer(body.attendees, "Attendees", 1),
-        preferredVenueId: integer(body.preferredVenueId, "preferredVenueId", 1),
-        projectorsRequired: integer(body.projectorsRequired, "Projectors"),
-        audioRequired: integer(body.audioRequired, "Audio systems"),
-        staffRequired: integer(body.staffRequired, "Staff"),
-      };
+      const input = normalizeBooking(body);
       return repo.transaction(() => {
         if (!repo.client(input.clientId))
           invalid("Selected client does not exist.");
         if (!repo.venue(input.preferredVenueId))
           invalid("Selected venue does not exist.");
-        return repo.createBooking(input);
+        const decision = allocate(
+          input,
+          repo.venues(),
+          repo.reservations(input),
+        );
+        return repo.createBooking({
+          ...input,
+          status: decision.status,
+          hallId: decision.hallId,
+          allocatedVenueId: decision.allocatedVenueId,
+          rejectionReason: decision.feasible
+            ? null
+            : decision.reasons.map((r) => r.message).join(" "),
+          reasonDetails: JSON.stringify(decision.reasons),
+        });
+      });
+    },
+    checkAvailability(body) {
+      const input = normalizeBooking(body);
+      return repo.readTransaction(() => {
+        if (!repo.client(input.clientId))
+          invalid("Selected client does not exist.");
+        if (!repo.venue(input.preferredVenueId))
+          invalid("Selected venue does not exist.");
+        return {
+          ...allocate(input, repo.venues(), repo.reservations(input)),
+          snapshot: true,
+          message:
+            "Availability snapshot only; submission rechecks and reserves atomically.",
+        };
       });
     },
     bookings(query) {
@@ -59,5 +78,20 @@ export function createService(repo) {
         throw new AppError(404, "NOT_FOUND", "Event request not found.");
       return record;
     },
+  };
+}
+
+export function normalizeBooking(body) {
+  bodyObject(body);
+  return {
+    clientId: integer(body.clientId, "clientId", 1),
+    eventName: text(body.eventName, "Event name", 160),
+    eventDate: validateDate(body.eventDate),
+    ...reservationInterval(body.startTime, body.endTime),
+    attendees: integer(body.attendees, "Attendees", 1),
+    preferredVenueId: integer(body.preferredVenueId, "preferredVenueId", 1),
+    projectorsRequired: integer(body.projectorsRequired, "Projectors"),
+    audioRequired: integer(body.audioRequired, "Audio systems"),
+    staffRequired: integer(body.staffRequired, "Staff"),
   };
 }

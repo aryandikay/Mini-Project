@@ -157,7 +157,7 @@ test("client validation rejects malformed inputs", async () => {
   ])
     assert.equal((await request("/clients", input)).status, 400);
 });
-test("valid booking is pending, buffered and unallocated even when allocation fields are supplied", async () => {
+test("valid booking is confirmed by the scheduler, ignoring caller allocation fields", async () => {
   const created = await request("/bookings", {
     ...valid(),
     status: "CONFIRMED",
@@ -166,16 +166,16 @@ test("valid booking is pending, buffered and unallocated even when allocation fi
   });
   assert.equal(created.status, 201);
   booking = created.body.data;
-  assert.equal(booking.status, "PENDING");
-  assert.equal(booking.hallId, null);
-  assert.equal(booking.allocatedVenueId, null);
+  assert.equal(booking.status, "CONFIRMED");
+  assert.equal(booking.hallName, "Hall A2");
+  assert.equal(booking.allocatedVenueId, venue.id);
   assert.equal(booking.reservedStartMinute, 480);
   assert.equal(booking.reservedEndMinute, 1320);
   assert.equal(booking.startTime, "08:30");
   assert.equal(booking.clientName, client.name);
   assert.equal(
     db.prepare("SELECT status FROM bookings WHERE id=?").get(booking.id).status,
-    "PENDING",
+    "CONFIRMED",
   );
 });
 test("booking lists, details and combined filters query stored data", async () => {
@@ -185,7 +185,7 @@ test("booking lists, details and combined filters query stored data", async () =
     booking,
   );
   assert.equal(
-    (await request("/bookings?date=2027-02-28&status=PENDING")).body.data
+    (await request("/bookings?date=2027-02-28&status=CONFIRMED")).body.data
       .length,
     1,
   );
@@ -193,10 +193,7 @@ test("booking lists, details and combined filters query stored data", async () =
     (await request("/bookings?date=2027-02-27")).body.data.length,
     0,
   );
-  assert.equal(
-    (await request("/bookings?status=CONFIRMED")).body.data.length,
-    0,
-  );
+  assert.equal((await request("/bookings?status=PENDING")).body.data.length, 0);
   for (const route of [
     "/bookings?status=UNKNOWN",
     "/bookings?date=2027-02-29",
@@ -233,14 +230,15 @@ test("booking validation rejects missing, malformed and out-of-range inputs with
     });
   assert.equal((await request("/bookings")).body.data.length, 1);
 });
-test("Phase 1 does not reject overlap or exceedance using incomplete allocation", async () => {
+test("infeasible requests persist as rejected with reasons", async () => {
   const result = await request("/bookings", {
     ...valid(),
     attendees: 1000,
     projectorsRequired: 50,
   });
   assert.equal(result.status, 201);
-  assert.equal(result.body.data.status, "PENDING");
+  assert.equal(result.body.data.status, "REJECTED");
+  assert.ok(result.body.data.reasons.length > 0);
   assert.equal(result.body.data.hallId, null);
 });
 test("database constraints defend status, foreign keys, intervals, integers and allocation consistency", () => {
@@ -303,4 +301,20 @@ test("application restart and repeated initialization preserve clients and reque
   );
   assert.equal((await request("/clients")).body.data.length, 2);
   assert.equal((await request("/bookings")).body.data.length, 2);
+});
+
+test("availability endpoint is non-persistent and uses validated input", async () => {
+  const before = (await request("/bookings")).body.data.length;
+  const preview = await request("/availability/check", {
+    ...valid(),
+    eventDate: "2028-01-01",
+  });
+  assert.equal(preview.status, 200);
+  assert.equal(preview.body.data.feasible, true);
+  assert.equal(preview.body.data.snapshot, true);
+  assert.equal((await request("/bookings")).body.data.length, before);
+  assert.equal(
+    (await request("/availability/check", { ...valid(), attendees: 0 })).status,
+    400,
+  );
 });

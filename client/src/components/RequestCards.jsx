@@ -52,6 +52,9 @@ export function RequestCards({ bookings }) {
               </dd>
             </div>
           </dl>
+          {booking.rejectionReason && (
+            <p className="notice error">{booking.rejectionReason}</p>
+          )}
         </article>
       ))}
     </div>

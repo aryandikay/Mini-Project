@@ -1,8 +1,8 @@
-# EventSync — Phase 1
+# EventSync — Phase 2
 
-A local event-request workspace for clients, campus venues, and pending event requests. React + Vite + Tailwind CSS, Express 5, and SQLite via better-sqlite3. No external accounts or paid services are needed.
+A local event-request workspace for clients, campus venues, and automatically allocated bookings. React + Vite + Tailwind CSS, Express 5, and SQLite via better-sqlite3. No external accounts or paid services are needed.
 
-**Requests are not bookings confirmed for use.** Every submission is `PENDING`, with no allocated venue or hall. Phase 1 validates input and operating hours, but does not check capacity, conflicts, or shared-resource availability. Quantities above inventory can be submitted for later allocation review.
+New requests are automatically **CONFIRMED** with a venue/hall or **REJECTED** with constraint explanations. Capacity, buffered hall conflicts and peak shared-resource usage are checked atomically. Historical Phase 1 pending requests remain unchanged. See [scheduling design](docs/SCHEDULING.md).
 
 ## Quick start
 
@@ -23,7 +23,7 @@ Optional: copy `.env.example` to `.env`. `PORT` changes the API port; update `AP
 1. View all three venues and their six halls on Overview. Inventory is venue-wide, shared by its halls.
 2. Open Clients and create a client (name required; email and phone optional).
 3. Create an event request. Select the client and preferred venue and fill in event details and resource quantities.
-4. Submit to save a pending request. Event requests displays stored requests and supports date/status filters. Click an event name for its database-backed details.
+4. Submit to receive a confirmed allocation or a persisted rejection with explanations. Event requests displays stored requests and supports date/status filters. Click an event name for its database-backed details.
 5. Restart the application or refresh the browser: clients and requests remain in SQLite. The footer's Refresh data action retrieves changes made by other sessions.
 
 Each event includes 30 minutes of setup and 30 minutes of cleanup within 08:00–22:00. Therefore the earliest event start is 08:30 and latest event end is 21:30. Same-day positive durations only; past dates are permitted because the supplied requirements do not prohibit them. No allocation is implied by the venue directory.
@@ -52,7 +52,7 @@ For a local production-mode check, run `npm run build` followed by `npm start` a
 - `client/src/components/`: page headings, fields, status/feedback and request presentation.
 - `client/src/services/api.js`: the only frontend HTTP access layer; consistently decodes success/error responses. Same-origin `/api` supports both development proxy and Express static serving.
 - `server/src/routes/` registers endpoints; `controllers/` handles HTTP orchestration; `services/` validates inputs and owns application transactions; `repositories/` owns parameterized SQL and camelCase response mapping.
-- `server/src/utils/time.js`: strict calendar/time parsing, minutes-from-midnight conversion and reservation buffers, reusable by a future allocation engine.
+- `server/src/utils/time.js`: strict calendar/time parsing, minutes-from-midnight conversion and reservation buffers, reused by the allocation engine.
 - `server/src/db/`: centralized connections, non-destructive schema creation and transactional idempotent official seeding. WAL, foreign keys and busy timeout are enabled. Initialization never deletes clients or requests.
 - `server/src/middleware/`: consistent errors with safe public messages; unexpected details are logged only on the server.
 - `server/tests/` and `e2e/`: database/API/time and real-browser integration tests.
@@ -61,7 +61,7 @@ For a local production-mode check, run `npm run build` followed by `npm start` a
 
 Four tables: `clients`, `venues`, `halls`, `bookings`. A client has many requests; a venue has many halls and venue-wide resource inventory. Requests reference clients and preferred venues. Nullable allocated venue/hall fields support future scheduling, with a composite foreign key preventing hall/venue mismatches. States are `PENDING`, `CONFIRMED`, `REJECTED`, `CANCELLED`; pending rows cannot have allocation and confirmed rows must have it. Numeric, interval, status and relationship constraints are enforced in SQLite, with stricter calendar/type validation in the service layer. Indexes cover date, status, hall/date/interval and allocated venue/date/interval.
 
-Booking rows store event date, integer event and reserved start/end minutes, attendees, requested resources, allocation fields, status, optional rejection reason, and creation/update timestamps. Inventory is never duplicated onto halls and no mutable utilization counter is stored. Future lifecycle services must update `updated_at` explicitly; Phase 1 exposes no update or delete endpoint. Schema creation is not a migration framework: future schema changes require a deliberate non-destructive migration.
+Booking rows store event date, integer event and reserved start/end minutes, attendees, requested resources, allocation fields, status, optional rejection reason, and creation/update timestamps. Inventory is never duplicated onto halls and no mutable utilization counter is stored. Future lifecycle services must update `updated_at` explicitly; Phase 2 exposes no update or delete endpoint. Startup additively migrates `reason_details` for structured rejection explanations without changing historical rows. Future schema changes require deliberate non-destructive migrations.
 
 | Venue   | Halls and capacities       | Projectors | Audio systems | Support staff |
 | ------- | -------------------------- | ---------- | ------------- | ------------- |
@@ -77,8 +77,6 @@ See [docs/API.md](docs/API.md) for exact requests, fields, response shapes and e
 
 ## Scope, assumptions and handoff
 
-Only the uploaded Phase 1 implementation prompt was available. The separately referenced official EventSync problem statement and research/architecture reports were **not attached or accessible**. The dataset and operating rules above implement those explicitly reproduced in the prompt; they have not been independently compared to the missing statement. No existing application or repository-specific agent instructions were present.
+The Phase 1 and Phase 2 implementation prompts were accessible. The separately referenced official problem statement and research reports remain unavailable. Rules and sample scenarios follow the supplied prompts. Equal choices use capacity, venue ID, then hall ID; this is a documented implementation assumption.
 
-Phase 1 deliberately defers scheduling, capacity checks, preferred-venue allocation, interval conflict detection, shared-resource checks, confirmation/rejection decisions, cancellation, rescheduling and recommendations. There are no buttons pretending to perform those actions. No authentication is implemented; this is a local college prototype, not a public multi-tenant deployment.
-
-Phase 2 should add an allocation service under `server/src/services/`, reuse time utilities and centralized transaction ownership, and perform checks and writes atomically. Keep the existing camelCase booking request body stable; extend outcomes through existing status, allocation and rejection fields. Query overlaps using reserved intervals and venue-wide inventory, without used-resource counters. Preserve records and avoid destructive startup schema changes. Do not implement allocation in route handlers or UI components.
+Cancellation, rescheduling and recommendations remain deferred. No authentication is implemented; this is a local college prototype. See [scheduling design and Phase 3 handoff](docs/SCHEDULING.md) for transaction ownership, complexity and extension points.

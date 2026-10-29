@@ -1,3 +1,18 @@
+# Current Phase 2 verification
+
+- `npm test`: 52 passed, 0 failed, 0 skipped.
+- `npm run build`: production build passed.
+- `PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH=/usr/bin/chromium npm run test:e2e`: 3 passed, 0 failed.
+- `git diff --check`: passed.
+
+Scheduling tests cover the supplied official scenario, deterministic selection, buffers and boundaries, peak resource usage, all three resource shortages across halls, database/API persistence, non-reserving previews, rollback, concurrent independent connections, and repeated additive upgrade of a legacy database. Browser tests verify confirmed venue/hall display and restart persistence, rejected explanations after reload, and network-error recovery. Tests use isolated databases; no test bookings were inserted into development data. No package changes were required.
+
+Windows and large-scale load testing remain unverified. The separate official PDF is still unavailable. Concurrency verification is a focused two-connection race, documented in [SCHEDULING.md](SCHEDULING.md). Phase 1 submission expectations were intentionally updated from pending to confirmed/rejected; unrelated regressions are retained.
+
+The following is the historical Phase 1 verification record, not the current scheduling behavior.
+
+---
+
 # Phase 1 verification
 
 Validated on Linux with Node.js 24.19.0, npm 11.9.0, and system Chromium. Scope is the accessible Phase 1 prompt; the separate official problem statement was unavailable.

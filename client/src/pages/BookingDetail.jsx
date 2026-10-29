@@ -50,9 +50,6 @@ export default function BookingDetail() {
             {state.booking.status === "PENDING" &&
               " This request is awaiting allocation and is not confirmed."}
           </div>
-          {state.booking.rejectionReason && (
-            <Feedback>{state.booking.rejectionReason}</Feedback>
-          )}
         </>
       )}
     </>

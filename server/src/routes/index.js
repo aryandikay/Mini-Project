@@ -1,6 +1,7 @@
 import { Router } from "express";
 export function apiRoutes(controller) {
   const router = Router();
+  router.post("/availability/check", controller.checkAvailability);
   router.get("/health", controller.health);
   router.get("/clients", controller.clients);
   router.post("/clients", controller.createClient);

@@ -1,6 +1,6 @@
-# EventSync Phase 1 REST contract
+# EventSync Phase 2 REST contract
 
-Base path `/api`. JSON requests use `Content-Type: application/json`. Success: `{ "data": ... }`. Errors: `{ "error": { "code": "VALIDATION_ERROR", "message": "Human-readable explanation." } }`. All JSON properties use camelCase. Requests never perform allocation in this phase.
+Base path `/api`. JSON requests use `Content-Type: application/json`. Success: `{ "data": ... }`. Errors: `{ "error": { "code": "VALIDATION_ERROR", "message": "Human-readable explanation." } }`. All JSON properties use camelCase. Submissions perform atomic scheduling; availability checks return a non-reserving snapshot.
 
 | Method / path       | Status | Data                                                                   |
 | ------------------- | ------ | ---------------------------------------------------------------------- |
@@ -8,11 +8,11 @@ Base path `/api`. JSON requests use `Content-Type: application/json`. Success: `
 | `POST /clients`     | 201    | Created client                                                         |
 | `GET /clients`      | 200    | Client array, newest ID first                                          |
 | `GET /venues`       | 200    | Venue array with nested halls, ordered by ID                           |
-| `POST /bookings`    | 201    | Created pending request; `Location: /api/bookings/:id`                 |
+| `POST /bookings`    | 201    | Persisted confirmed or rejected request; `Location: /api/bookings/:id` |
 | `GET /bookings`     | 200    | Request array, newest ID first                                         |
 | `GET /bookings/:id` | 200    | One request or 404                                                     |
 
-`GET /bookings?date=2027-03-20&status=PENDING` supports either or both exact filters. Status must be `PENDING`, `CONFIRMED`, `REJECTED`, or `CANCELLED`. Invalid filters or IDs return 400; valid IDs without records return 404. List endpoints return an empty array when there are no matches. Pagination and mutation endpoints for later lifecycle states are not part of Phase 1.
+`GET /bookings?date=2027-03-20&status=PENDING` supports either or both exact filters. Status must be `PENDING`, `CONFIRMED`, `REJECTED`, or `CANCELLED`. Invalid filters or IDs return 400; valid IDs without records return 404. List endpoints return an empty array when there are no matches. Pagination and mutation endpoints for later lifecycle states are not part of Phase 2.
 
 ## Clients
 
@@ -71,21 +71,28 @@ Example response data (IDs and timestamps vary):
   "attendees": 85,
   "preferredVenueId": 2,
   "preferredVenueName": "Venue B",
-  "allocatedVenueId": null,
-  "allocatedVenueName": null,
-  "hallId": null,
-  "hallName": null,
+  "allocatedVenueId": 2,
+  "allocatedVenueName": "Venue B",
+  "hallId": 3,
+  "hallName": "Hall B1",
   "projectorsRequired": 1,
   "audioRequired": 1,
   "staffRequired": 2,
-  "status": "PENDING",
+  "status": "CONFIRMED",
+  "reasons": [],
   "rejectionReason": null,
   "createdAt": "2027-03-01T10:00:00.000Z",
   "updatedAt": "2027-03-01T10:00:00.000Z"
 }
 ```
 
-Only listed input fields are consumed; client-supplied `status`, allocation, reservation and timestamp fields cannot override server-owned values. Resource demand, hall capacity and overlapping requests are not allocation-validated in Phase 1; any otherwise valid request is stored pending. A 201 means **request persisted**, not booking confirmed. GET detail/list returns the same record shape. Resource and allocation fields support future phases without changing submission inputs.
+Only listed input fields are consumed; caller status/allocation fields cannot override the scheduling decision. Both CONFIRMED and REJECTED outcomes return 201 because the decision is persisted. Check `data.status` to distinguish them. Rejections contain null allocation fields, a readable `rejectionReason`, and `reasons` objects with `code`, `venueId`, `message`, and resource `requested`, `peak`, `available` quantities where relevant. No other clients' booking details appear. Historical pending requests remain unchanged and return an empty reasons array.
+
+### POST /availability/check
+
+Accepts the exact same full booking payload and validation as submission. Returns 200 `{ data: { feasible, status, allocatedVenueId, hallId, reservedStartMinute, reservedEndMinute, reasons, snapshot: true, message } }`; feasible results additionally include allocated venue/hall names. Uses the same scheduler in a consistent read transaction. No records are written. Submission always rechecks inside an immediate write transaction, so a feasible preview is not a guarantee.
+
+Operating-hour violations continue returning 400 with no record, preserving Phase 1 validation and database interval constraints. Valid but unschedulable requests return persisted REJECTED decisions.
 
 ## Errors
 

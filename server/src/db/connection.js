@@ -22,6 +22,17 @@ export function openDatabase(
     db.transaction(() =>
       db.exec(readFileSync(new URL("./schema.sql", import.meta.url), "utf8")),
     )();
+    db.transaction(() => {
+      if (
+        !db
+          .pragma("table_info(bookings)")
+          .some((column) => column.name === "reason_details")
+      ) {
+        db.exec(
+          "ALTER TABLE bookings ADD COLUMN reason_details TEXT NOT NULL DEFAULT '[]'",
+        );
+      }
+    }).immediate();
     seed(db);
     return db;
   } catch (error) {

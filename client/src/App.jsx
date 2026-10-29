@@ -66,7 +66,7 @@ export default function App() {
           <i /> EventSync workspace
         </span>
         <span>
-          PHASE 1 <b>·</b> REQUEST MANAGEMENT
+          PHASE 2 <b>·</b> REQUEST MANAGEMENT
         </span>
       </div>
       <main id="main">
@@ -120,7 +120,7 @@ export default function App() {
         <span className="footer-brand">
           eventsync<span> / </span>Room for every idea.
         </span>
-        <span>Venue-local time · Requests remain pending until allocation</span>
+        <span>Venue-local time · Allocation includes setup and cleanup</span>
         <button className="refresh-button" onClick={refresh} disabled={loading}>
           Refresh data ↻
         </button>

@@ -70,7 +70,7 @@ test.afterAll(async () => {
   await stop(apiProcess);
   if (directory) rmSync(directory, { recursive: true, force: true });
 });
-test("real UI client → pending request → detail → restart persistence; desktop and mobile", async ({
+test("real UI client → confirmed booking → detail → restart persistence; desktop and mobile", async ({
   page,
 }) => {
   page.on("pageerror", (error) => errors.push(error.message));
@@ -123,16 +123,16 @@ test("real UI client → pending request → detail → restart persistence; des
   await page.getByLabel("End time").fill("12:00");
   await page.getByRole("button", { name: "Submit event request" }).click();
   await expect(page).toHaveURL("/bookings");
-  await expect(page.getByRole("status")).toContainText(
-    "not a confirmed booking",
-  );
+  await expect(page.getByRole("status")).toContainText("confirmed:");
   await expect(
     page.getByRole("heading", { name: "Campus Innovation Day" }),
   ).toBeVisible();
   await expect(
-    page.locator(".badge").filter({ hasText: "Pending allocation" }),
+    page.locator(".badge").filter({ hasText: "Confirmed" }),
   ).toBeVisible();
-  await expect(page.getByText("Not allocated", { exact: true })).toBeVisible();
+  await expect(
+    page.getByText("Venue B · Hall B1", { exact: true }),
+  ).toBeVisible();
   await page.getByRole("link", { name: "Campus Innovation Day" }).click();
   await expect(page.getByText("09:30 – 12:30", { exact: false })).toBeVisible();
   await stop(apiProcess);
@@ -142,10 +142,10 @@ test("real UI client → pending request → detail → restart persistence; des
     page.getByRole("heading", { name: "Campus Innovation Day" }),
   ).toBeVisible();
   await expect(
-    page.locator(".badge").filter({ hasText: "Pending allocation" }),
+    page.locator(".badge").filter({ hasText: "Confirmed" }),
   ).toBeVisible();
   await page.getByRole("link", { name: "All requests" }).click();
-  await page.getByLabel("Status").selectOption("CONFIRMED");
+  await page.getByLabel("Status").selectOption("REJECTED");
   await expect(
     page.getByRole("heading", { name: "No matching requests" }),
   ).toBeVisible();
@@ -189,4 +189,34 @@ test("network failure is visible and retry recovers real backend data", async ({
   await expect(
     page.getByRole("heading", { name: "Venue A", exact: true }),
   ).toBeVisible();
+});
+
+test("UI displays persisted rejection reasons", async ({ page }) => {
+  await page.goto("/clients");
+  await page.getByLabel("Client name").fill("Rejection client");
+  await page.getByRole("button", { name: "Add client", exact: true }).click();
+  await expect(
+    page.getByRole("heading", { name: "Rejection client" }),
+  ).toBeVisible();
+  await page.goto("/new");
+  await page
+    .getByLabel("Client", { exact: true })
+    .selectOption({ label: "Rejection client" });
+  await page.getByLabel("Event name").fill("Too large");
+  await page.getByLabel("Event date").fill("2028-01-01");
+  await page.getByLabel("Attendees").fill("999");
+  await page.getByLabel("Start time").fill("10:00");
+  await page.getByLabel("End time").fill("12:00");
+  await page.getByLabel("Preferred venue").selectOption({ label: "Venue A" });
+  await page.getByRole("button", { name: "Submit event request" }).click();
+  await expect(
+    page.locator(".badge").filter({ hasText: "Rejected" }),
+  ).toBeVisible();
+  await expect(
+    page.locator(".request-card").filter({ hasText: "Too large" }),
+  ).toContainText("No hall seats 999");
+  await page.reload();
+  await expect(
+    page.locator(".request-card").filter({ hasText: "Too large" }),
+  ).toContainText("Not allocated");
 });

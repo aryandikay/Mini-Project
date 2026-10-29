@@ -22,7 +22,17 @@ export default function Bookings({ bookings }) {
       >
         A clear view of every submission, all in one place.
       </PageTitle>
-      {location.state?.message && <Feedback>{location.state.message}</Feedback>}
+      {location.state?.message && (
+        <Feedback
+          error={
+            location.state.outcome === "REJECTED"
+              ? location.state.message
+              : undefined
+          }
+        >
+          {location.state.message}
+        </Feedback>
+      )}
       <div className="filter-bar">
         <Field label="Event date">
           <input
