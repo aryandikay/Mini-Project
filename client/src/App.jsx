@@ -1,5 +1,6 @@
+import Utilization from "./pages/Utilization.jsx";
 import Schedule from "./pages/Schedule.jsx";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Link, NavLink, Route, Routes } from "react-router-dom";
 import { api } from "./services/api.js";
 import { Feedback } from "./components/Common.jsx";
@@ -12,7 +13,11 @@ export default function App() {
   const [data, setData] = useState({ venues: [], clients: [], bookings: [] });
   const [loading, setLoading] = useState(true),
     [error, setError] = useState("");
+  const [refreshError, setRefreshError] = useState("");
+  const refreshSequence = useRef(0);
   const refresh = useCallback(async (quiet = false) => {
+    const sequence = ++refreshSequence.current;
+    setRefreshError("");
     if (quiet !== true) setLoading(true);
     setError("");
     try {
@@ -22,15 +27,22 @@ export default function App() {
         api.bookings(),
         api.dashboard(),
       ]);
-      setData({ venues, clients, bookings, dashboard });
+      if (sequence === refreshSequence.current)
+        setData({ venues, clients, bookings, dashboard });
     } catch (e) {
-      setError(e.message);
+      if (sequence === refreshSequence.current) {
+        if (quiet === true) setRefreshError(e.message);
+        else setError(e.message);
+      }
     } finally {
-      setLoading(false);
+      if (sequence === refreshSequence.current) setLoading(false);
     }
   }, []);
   useEffect(() => {
     refresh();
+    return () => {
+      refreshSequence.current++;
+    };
   }, [refresh]);
   const addClient = (client) =>
     setData((current) => ({
@@ -54,6 +66,7 @@ export default function App() {
           </NavLink>
           <NavLink to="/bookings">Event requests</NavLink>
           <NavLink to="/schedule">Schedule</NavLink>
+          <NavLink to="/utilization">Utilization</NavLink>
           <NavLink to="/clients">Clients</NavLink>
         </nav>
         <Link to="/new" className="header-action">
@@ -65,10 +78,20 @@ export default function App() {
           <i /> EventSync workspace
         </span>
         <span>
-          PHASE 4 <b>·</b> REQUEST MANAGEMENT
+          VENUES <b>·</b> EVENTS <b>·</b> RESOURCES
         </span>
       </div>
       <main id="main">
+        {refreshError && (
+          <div className="panel">
+            <Feedback
+              error={`Workspace totals may be out of date. Your completed booking operation is saved. ${refreshError}`}
+            />
+            <button className="button secondary" onClick={() => refresh(true)}>
+              Retry workspace refresh
+            </button>
+          </div>
+        )}
         {loading ? (
           <div className="loading" role="status">
             <span className="spinner" />
@@ -83,6 +106,16 @@ export default function App() {
           </div>
         ) : (
           <Routes>
+            <Route
+              path="/utilization"
+              element={
+                <Utilization
+                  venues={data.venues}
+                  today={data.dashboard.today}
+                  revision={data.bookings}
+                />
+              }
+            />
             <Route path="/" element={<Dashboard {...data} />} />
             <Route
               path="/clients"

@@ -27,6 +27,9 @@ export default function NewBooking({ clients, venues, onCreated }) {
     [busy, setBusy] = useState(false),
     [error, setError] = useState("");
   const navigate = useNavigate();
+  const selectedVenue = venues.find(
+    (v) => v.id === Number(form.preferredVenueId),
+  );
   const props = (name) => ({
     value: form[name],
     onChange: (e) =>
@@ -222,6 +225,24 @@ export default function NewBooking({ clients, venues, onCreated }) {
             Every event includes 30 minutes for setup and 30 minutes for
             cleanup.
           </p>
+          {selectedVenue && (
+            <div className="notice">
+              <h3>{selectedVenue.name}</h3>
+              <p>
+                {selectedVenue.halls
+                  .map((h) => `${h.name}: ${h.capacity} guests`)
+                  .join(" · ")}
+              </p>
+              <p>
+                {selectedVenue.totalProjectors} projectors ·{" "}
+                {selectedVenue.totalAudioSystems} audio systems ·{" "}
+                {selectedVenue.totalStaff} staff shared across halls.
+              </p>
+              <small>
+                Inventory totals; availability is checked on submission.
+              </small>
+            </div>
+          )}
           <div className="time-guide">
             <div>
               <span>Venue operating hours</span>

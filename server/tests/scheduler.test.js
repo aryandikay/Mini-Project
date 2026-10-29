@@ -331,3 +331,68 @@ for (const [field, total] of [
     );
   });
 }
+
+for (const [resource, amount] of [
+  ["projectorsRequired", 2],
+  ["audioRequired", 2],
+  ["staffRequired", 5],
+])
+  test(`independent writers competing for shared ${resource} cannot overbook different halls`, async (t) => {
+    const dir = mkdtempSync(join(tmpdir(), "eventsync-resource-race-"));
+    t.after(() => rmSync(dir, { recursive: true, force: true }));
+    const path = join(dir, "db.sqlite");
+    const db = openDatabase(path);
+    const service = createService(createRepository(db));
+    service.createClient({ name: "Resource race" });
+    const barrier = new SharedArrayBuffer(4),
+      flag = new Int32Array(barrier);
+    const workers = [50, 120].map(
+      (attendees) =>
+        new Worker(new URL("../test-support/concurrent.js", import.meta.url), {
+          workerData: {
+            path,
+            barrier,
+            input: {
+              ...request,
+              attendees,
+              projectorsRequired: 0,
+              audioRequired: 0,
+              staffRequired: 0,
+              [resource]: amount,
+            },
+          },
+        }),
+    );
+    t.after(async () => {
+      await Promise.all(workers.map((w) => w.terminate()));
+      db.close();
+    });
+    const results = workers.map(
+      (w) =>
+        new Promise((resolve, reject) => {
+          w.on("error", reject);
+          w.on("message", (m) => {
+            if (m !== "ready") resolve(m);
+          });
+        }),
+    );
+    await Promise.all(
+      workers.map(
+        (w) =>
+          new Promise((resolve, reject) => {
+            w.on("error", reject);
+            w.once("message", resolve);
+          }),
+      ),
+    );
+    Atomics.store(flag, 0, 1);
+    Atomics.notify(flag, 0, 2);
+    assert.deepEqual(await Promise.all(results), ["CONFIRMED", "CONFIRMED"]);
+    const rows = service.bookings({ status: "CONFIRMED" });
+    assert.equal(
+      rows.filter((b) => b.allocatedVenueId === request.preferredVenueId)
+        .length,
+      1,
+    );
+    assert.equal(new Set(rows.map((b) => b.allocatedVenueId)).size, 2);
+  });

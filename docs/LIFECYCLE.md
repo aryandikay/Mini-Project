@@ -26,6 +26,6 @@ Tests use temporary databases and exercise cancellation release, preservation of
 
 Browser tests use the actual frontend, API and SQLite, covering submission, successful rescheduling, a failed proposal with original allocation still visible, schedule movement, cancellation confirmation, persisted cancelled status, dashboard counts and mobile overflow. These focused races are not a load or distributed-deployment benchmark. Windows remains unverified. The separate official PDF is unavailable; implementation follows the supplied Phase 3 prompt.
 
-## Phase 4 handoff
+## Recommendation and analytics integration
 
-Reuse `normalizeBooking`, `allocate`, `overlaps`, `peakUsage`, reservation queries and `/availability/check` for any future authorized search over proposed dates/times. Keep previews non-persistent and revalidate the final choice inside an immediate transaction. Recommendation ranking and alternative-slot search are not implemented. Any future utilization metrics must derive from current confirmed intervals and the same venue timezone convention.
+Phase 4 implements bounded alternative-slot search and ranking using the same allocator and confirmed reservation queries. Previews are non-persistent and final selection revalidates inside an immediate transaction; see [RECOMMENDATIONS.md](RECOMMENDATIONS.md). Optional recommendations for rescheduling remain deferred. Phase 5 analytics derives peak and time-weighted metrics from current confirmed intervals, including buffers; see [ANALYTICS.md](ANALYTICS.md). Cancellation and successful rescheduling affect the next analytics snapshot.

@@ -1,3 +1,21 @@
+# Phase 5 final verification
+
+- `npm test`: **93 passed, 0 failed, 0 skipped**. Adds analytics math/HTTP, independent invariant detection and mixed lifecycle checks, demo persistence, and three independent-writer resource races.
+- `PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH=/usr/bin/chromium npm run test:e2e`: **9 passed**. Includes seven prior real workflows plus background refresh failure/recovery and utilization filters, actual metrics, cancellation release, error/retry and mobile layout.
+- `npm run build`: **passed**, 54 modules transformed.
+- Production server with temporary database on port 3109: health, SPA deep link and analytics HTTP **passed**.
+- Demo reset invoked twice: deterministic IDs/outcomes and unchanged normal SQLite file hashes.
+- Analytics desktop/mobile screenshots captured and visually inspected. No mobile horizontal overflow.
+- `git diff --check`: passed.
+
+The refresh regression first failed on the pre-fix code, reproducing the identified issue. One new fractional analytics expectation was corrected to a tight floating-point tolerance. Final suites pass without removals or weakened existing tests. All automated booking fixtures use temporary or in-memory databases. No load benchmark, non-Chromium coverage or comprehensive accessibility certification is claimed.
+
+See [full completion report](PHASE5_REPORT.md), [initial audit](AUDIT.md), [demo guide](DEMO.md) and [analytics definitions](ANALYTICS.md).
+
+---
+
+Historical verification follows (counts refer to their respective phases):
+
 # Current Phase 4 verification
 
 - `npm test`: **82 passed, 0 failed, 0 skipped**, including earlier-phase regressions and independent-connection concurrency tests.

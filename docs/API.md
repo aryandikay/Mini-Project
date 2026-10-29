@@ -1,4 +1,4 @@
-# EventSync Phase 4 REST contract
+# EventSync Phase 5 REST contract
 
 Base path `/api`. JSON requests use `Content-Type: application/json`. Success: `{ "data": ... }`. Errors: `{ "error": { "code": "VALIDATION_ERROR", "message": "Human-readable explanation." } }`. All JSON properties use camelCase. Submissions perform atomic scheduling; availability checks return a non-reserving snapshot.
 
@@ -145,3 +145,10 @@ The reasons above illustrate one venue; actual responses contain all computed fa
 `POST /api/recommendations` accepts `{ request: <scheduling fields with optional clientId/eventName>, search?: { horizonDays, stepMinutes, limit, preferVenue } }`. It returns 200 `{ data: { originalRequest, originalDecision, settings, searchedDates, evaluatedCandidates, totalFeasible, count, recommendations, provisional, message } }` without any writes. Defaults: one total day, 15-minute step, five results, preferred venue first. Limits and result field definitions are in [RECOMMENDATIONS.md](RECOMMENDATIONS.md).
 
 Selected options use the unchanged `POST /bookings` transaction with the suggested venue as a preference, never a forced allocation. The original rejection remains historical. Invalid searches return 400; valid empty searches return 200; database failures remain 500. No arbitrary reservation exclusion or rescheduling recommendation context is supported.
+
+
+## Resource utilization (Phase 5)
+
+`GET /api/analytics/utilization?date=2030-04-15&venueId=1&startTime=09:00&endTime=15:00`
+
+Read-only, consistent snapshot of confirmed reservations. Date is required; venue is optional; interval defaults to 08:00–22:00. Returns `{data: {date, startTime, endTime, durationMinutes, includesBuffers, venues}}`. Venue metrics include confirmed count, resource capacity/peak/resource-minutes/peak percentage/time-weighted average percentage and per-hall occupancy. Malformed queries return 400; no writes occur. See [ANALYTICS.md](ANALYTICS.md) for complete field semantics and formulas.

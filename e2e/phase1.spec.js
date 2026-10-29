@@ -490,3 +490,129 @@ test("recommendation empty state and network error recovery", async ({
     0,
   );
 });
+
+test("successful cancellation remains visible when the dashboard refresh fails", async ({
+  page,
+  request,
+}) => {
+  const client = (
+    await (
+      await request.post("/api/clients", { data: { name: "Refresh recovery" } })
+    ).json()
+  ).data;
+  const booking = (
+    await (
+      await request.post("/api/bookings", {
+        data: {
+          clientId: client.id,
+          eventName: "Refresh recovery event",
+          eventDate: "2098-05-01",
+          startTime: "10:00",
+          endTime: "11:00",
+          attendees: 20,
+          preferredVenueId: 1,
+          projectorsRequired: 0,
+          audioRequired: 0,
+          staffRequired: 0,
+        },
+      })
+    ).json()
+  ).data;
+  await page.goto(`/bookings/${booking.id}`);
+  await page
+    .getByRole("button", { name: "Cancel booking", exact: true })
+    .click();
+  await page.route("**/api/dashboard", (route) => route.abort());
+  await page.getByRole("button", { name: "Confirm cancellation" }).click();
+  await expect(
+    page.locator(".badge").filter({ hasText: "Cancelled" }),
+  ).toBeVisible();
+  await expect(
+    page.getByText("Booking cancelled. Its hall and resources are released."),
+  ).toBeVisible();
+  await expect(page.getByRole("alert")).toContainText(
+    "Workspace totals may be out of date",
+  );
+  await page.unroute("**/api/dashboard");
+  await page.getByRole("button", { name: "Retry workspace refresh" }).click();
+  await expect(page.getByRole("alert")).toHaveCount(0);
+  await expect(
+    page.locator(".badge").filter({ hasText: "Cancelled" }),
+  ).toBeVisible();
+});
+
+test("utilization displays real interval metrics, filters, errors, cancellation release and mobile layout", async ({
+  page,
+  request,
+}) => {
+  const client = (
+    await (
+      await request.post("/api/clients", {
+        data: { name: "Utilization browser" },
+      })
+    ).json()
+  ).data;
+  const booking = (
+    await (
+      await request.post("/api/bookings", {
+        data: {
+          clientId: client.id,
+          eventName: "Measured event",
+          eventDate: "2098-07-01",
+          startTime: "10:00",
+          endTime: "11:00",
+          attendees: 50,
+          preferredVenueId: 1,
+          projectorsRequired: 1,
+          audioRequired: 1,
+          staffRequired: 2,
+        },
+      })
+    ).json()
+  ).data;
+  await page.goto("/");
+  await page.getByRole("link", { name: "Utilization", exact: true }).click();
+  await page.getByLabel("Utilization date").fill("2098-07-01");
+  await page.getByLabel("Venue", { exact: true }).selectOption("1");
+  await page.getByLabel("Interval start").fill("09:00");
+  await page.getByLabel("Interval end").fill("15:00");
+  const venue = page.getByRole("region", { name: "Venue A utilization" });
+  await expect(venue).toContainText("1 confirmed bookings");
+  await expect(venue).toContainText("120 reserved minutes · 33.3%");
+  await expect(
+    venue.getByRole("progressbar", { name: "Projectors average utilization" }),
+  ).toHaveAttribute("value", /16\.666/);
+  await page.screenshot({
+    path: "test-results/utilization-desktop.png",
+    fullPage: true,
+  });
+  await page.setViewportSize({ width: 390, height: 844 });
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= innerWidth,
+    ),
+  ).toBe(true);
+  await page.screenshot({
+    path: "test-results/utilization-mobile.png",
+    fullPage: true,
+  });
+  await request.patch(`/api/bookings/${booking.id}/cancel`, {
+    data: { expectedUpdatedAt: booking.updatedAt },
+  });
+  await page.getByRole("button", { name: "Refresh data" }).click();
+  await page.getByLabel("Utilization date").fill("2098-07-01");
+  await expect(
+    page.getByRole("region", { name: "Venue A utilization" }),
+  ).toContainText("No confirmed reservations");
+  await page.getByLabel("Interval start").fill("21:00");
+  await page.getByLabel("Interval end").fill("09:00");
+  await expect(page.getByRole("alert")).toContainText("positive duration");
+  await page.route("**/api/analytics/utilization?**", (route) => route.abort());
+  await page.getByLabel("Interval end").fill("22:00");
+  await expect(page.getByRole("alert")).toContainText("Unable to reach");
+  await page.unroute("**/api/analytics/utilization?**");
+  await page.getByRole("button", { name: "Retry utilization" }).click();
+  await expect(
+    page.getByRole("region", { name: "Venue A utilization" }),
+  ).toBeVisible();
+});

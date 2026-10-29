@@ -1,3 +1,4 @@
+import { analyticsService } from "./analytics.js";
 import { recommendationService } from "./recommendations.js";
 import { normalizeScheduling } from "../utils/schedulingInput.js";
 import { lifecycle } from "./lifecycle.js";
@@ -15,6 +16,7 @@ import { validateDate } from "../utils/time.js";
 export function createService(repo) {
   return {
     ...lifecycle(repo, normalizeBooking),
+    utilization: analyticsService(repo),
     recommendations: recommendationService(repo),
     dashboard: () => repo.readTransaction(() => repo.dashboard(venueNow())),
     health() {

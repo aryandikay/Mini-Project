@@ -31,6 +31,8 @@ async function request(path, options) {
   return payload.data;
 }
 export const api = {
+  utilization: (filters) =>
+    request(`/analytics/utilization?${new URLSearchParams(filters)}`),
   recommendations: (body) =>
     request("/recommendations", { method: "POST", body: JSON.stringify(body) }),
   dashboard: () => request("/dashboard"),

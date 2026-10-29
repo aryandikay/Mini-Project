@@ -1086,4 +1086,44 @@ footer {
   }
 }
 
-@media (max-width: 760px) { .brand small { font-size: 7px; letter-spacing: 1.4px; } .stat p { padding-right: 24px; min-height: 28px; } }
+@media (max-width: 760px) {
+  .brand small {
+    font-size: 7px;
+    letter-spacing: 1.4px;
+  }
+  .stat p {
+    padding-right: 24px;
+    min-height: 28px;
+  }
+}
+
+.utilization-venue {
+  margin-top: 20px;
+}
+.utilization-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 24px;
+  margin: 20px 0;
+}
+.utilization-metric p {
+  margin: 10px 0;
+}
+.utilization-metric small {
+  display: block;
+}
+progress {
+  width: 100%;
+  height: 12px;
+  accent-color: #296c50;
+}
+.hall-occupancy {
+  display: grid;
+  gap: 8px;
+  margin: 16px 0;
+}
+@media (max-width: 700px) {
+  .utilization-grid {
+    grid-template-columns: 1fr;
+  }
+}

@@ -8,3 +8,4 @@ server/data/
 *.log
 playwright-report/
 test-results/
+server/demo-data/

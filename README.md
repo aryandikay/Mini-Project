@@ -1,4 +1,4 @@
-# EventSync — Phase 4
+# EventSync — Phase 5
 
 A local event-request workspace for clients, campus venues, and automatically allocated bookings. React + Vite + Tailwind CSS, Express 5, and SQLite via better-sqlite3. No external accounts or paid services are needed.
 
@@ -59,9 +59,9 @@ For a local production-mode check, run `npm run build` followed by `npm start` a
 
 ## Database
 
-Four tables: `clients`, `venues`, `halls`, `bookings`. A client has many requests; a venue has many halls and venue-wide resource inventory. Requests reference clients and preferred venues. Nullable allocated venue/hall fields support future scheduling, with a composite foreign key preventing hall/venue mismatches. States are `PENDING`, `CONFIRMED`, `REJECTED`, `CANCELLED`; pending rows cannot have allocation and confirmed rows must have it. Numeric, interval, status and relationship constraints are enforced in SQLite, with stricter calendar/type validation in the service layer. Indexes cover date, status, hall/date/interval and allocated venue/date/interval.
+Four tables: `clients`, `venues`, `halls`, `bookings`. A client has many requests; a venue has many halls and venue-wide resource inventory. Requests reference clients and preferred venues. Nullable allocated venue/hall fields represent unallocated requests, with a composite foreign key preventing hall/venue mismatches. States are `PENDING`, `CONFIRMED`, `REJECTED`, `CANCELLED`; pending rows cannot have allocation and confirmed rows must have it. Numeric, interval, status and relationship constraints are enforced in SQLite, with stricter calendar/type validation in the service layer. Indexes cover date, status, hall/date/interval and allocated venue/date/interval.
 
-Booking rows store event date, integer event and reserved start/end minutes, attendees, requested resources, allocation fields, status, optional rejection reason, and creation/update timestamps. Inventory is never duplicated onto halls and no mutable utilization counter is stored. Future lifecycle services must update `updated_at` explicitly; Phase 3 exposes guarded lifecycle updates but no delete endpoint. Startup additively migrates `reason_details` for structured rejection explanations without changing historical rows. Future schema changes require deliberate non-destructive migrations.
+Booking rows store event date, integer event and reserved start/end minutes, attendees, requested resources, allocation fields, status, optional rejection reason, and creation/update timestamps. Inventory is never duplicated onto halls and no mutable utilization counter is stored. Lifecycle services update `updated_at` explicitly and expose guarded updates with no delete endpoint. Startup additively migrates `reason_details` for structured rejection explanations without changing historical rows. Future schema changes require deliberate non-destructive migrations.
 
 | Venue   | Halls and capacities       | Projectors | Audio systems | Support staff |
 | ------- | -------------------------- | ---------- | ------------- | ------------- |
@@ -77,18 +77,40 @@ See [docs/API.md](docs/API.md) for exact requests, fields, response shapes and e
 
 ## Scope, assumptions and handoff
 
-The Phase 1 and Phase 2 implementation prompts were accessible. The separately referenced official problem statement and research reports remain unavailable. Rules and sample scenarios follow the supplied prompts. Equal choices use capacity, venue ID, then hall ID; this is a documented implementation assumption.
+The supplied Phase 1–5 implementation prompts define the implementation scope. The separately referenced official problem statement and research reports remain unavailable. Rules and sample scenarios follow the supplied prompts. Equal choices use capacity, venue ID, then hall ID; this is a documented implementation assumption.
 
-Cancellation and atomic rescheduling are implemented. Alternative recommendations for rejected requests are implemented; optional rescheduling recommendations remain deferred. No authentication is implemented; this is a local college prototype. See [lifecycle design and Phase 4 handoff](docs/LIFECYCLE.md) for transaction ownership, complexity and extension points.
+Cancellation and atomic rescheduling are implemented. Alternative recommendations for rejected requests are implemented; optional rescheduling recommendations remain deferred. No authentication is implemented; this is a local college prototype. See [lifecycle design](docs/LIFECYCLE.md) for transaction ownership, complexity and extension points.
 
 ## Manage bookings
 
 Open a confirmed booking's details to reschedule or cancel it. Cancellation asks for confirmation and retains historical allocation details labeled as released. Rescheduling prefills current scheduling fields; failed proposals keep those entries for correction and leave the original booking visible. Only confirmed records expose lifecycle actions.
 
-The daily Schedule view lists confirmed events for a selected date, grouped by venue, with event and buffered intervals. Booking lists filter by date, status and allocated venue. The dashboard uses `/api/dashboard` for all lifecycle counts and the next ten confirmed events. Successful mutations refetch shared data; other browser sessions can use Refresh data to retrieve changes.
+The daily Schedule view lists confirmed events for a selected date, grouped by venue, with event and buffered intervals. Booking lists filter by date, status and allocated venue. The dashboard uses `/api/dashboard` for all lifecycle counts and the next ten confirmed events. Successful mutations refetch shared data. If a background refresh fails, the saved outcome stays visible with a retryable warning that totals may be stale. Other browser sessions can use Refresh data to retrieve changes.
 
 ## Search alternatives
 
 Open a rejected request using **Find alternatives**, then choose **Search alternatives**. The default search uses a 15-minute grid on the requested date and returns up to five options. You can expand to three or seven total days and change ranking priority. Select an option and explicitly confirm it to submit a new booking; original rejected history remains unchanged. Availability is rechecked before confirmation.
 
 See [recommendation design and API](docs/RECOMMENDATIONS.md) for search bounds, ranking, complexity, and deferred rescheduling recommendations.
+
+## Resource utilization
+
+Open **Utilization** to select a date, venue and interval (default 08:00–22:00). Actual confirmed reservations produce inventory, peak simultaneous projector/audio/staff demand, time-weighted average utilization and hall occupancy. Setup/cleanup count; cancelled and rejected requests do not. Metrics, validation and formulas are documented in [ANALYTICS.md](docs/ANALYTICS.md). No additional dependency is required.
+
+## Demonstrate and review
+
+```sh
+npm run demo:reset
+DB_PATH=./demo-data/eventsync-demo.sqlite npm run dev
+```
+
+The reset is explicit and targets only a separate demo database; stop services using that database first. Normal initialization never resets bookings. The fixed demo date is **2030-04-15**. See [DEMO.md](docs/DEMO.md) for PowerShell instructions, seeded IDs and the complete walkthrough.
+
+- [Implementation audit and requirement traceability](docs/AUDIT.md)
+- [Phase 5 completion report and acceptance checklist](docs/PHASE5_REPORT.md)
+- [Judges' technical reference and rubric evidence](docs/JUDGES.md)
+- [Executed verification](docs/VERIFICATION.md)
+
+The recommendation engine is the primary innovation: rejected requests can be turned into feasible alternatives while preserving requirements and revalidating before confirmation. Analytics adds visibility into actual resource use. The optional what-if UI remains deferred; the existing availability API already supports non-persistent checks.
+
+This remains a local trusted-user prototype. No authentication, multi-day events, automatic timezone conversion, distributed deployment, pagination or load benchmark is provided. Direct SQL writes bypass application scheduling rules. Browser verification uses Chromium; no full accessibility audit or cross-browser certification is claimed.
