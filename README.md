@@ -1,4 +1,4 @@
-# EventSync — Phase 5
+# EventSync — Phase 6
 
 EventSync is a local campus event-planning workspace that allocates halls and shared equipment, explains conflicts, recommends alternative arrangements, and lets managers inspect resources and simulate changes before committing them.
 
@@ -6,10 +6,11 @@ EventSync is a local campus event-planning workspace that allocates halls and sh
 
 Multiple clients compete for halls, projectors, audio systems and support staff. A hall can be free while its venue's shared equipment is exhausted. Setup and cleanup also reserve capacity. EventSync evaluates those constraints together and preserves historical booking records.
 
-The separate official problem-statement PDF was unavailable. The rules below follow the supplied implementation prompts; full compliance with an inaccessible document is not claimed. This is a controlled local prototype with no authentication.
+The separate official problem-statement PDF was unavailable. The rules below follow the supplied implementation prompts; full compliance with an inaccessible document is not claimed. This is a single-organization prototype with controlled staff accounts and server-side authentication.
 
 ## Features
 
+- Public product homepage, organizer login, protected workspace, profile/settings and administrator staff management.
 - Client management and the official three-venue/six-hall directory.
 - Automatic confirmation or persisted rejection with constraint explanations.
 - Atomic cancellation and rescheduling, including preservation after failed proposals.
@@ -59,7 +60,7 @@ A feasible preview can be applied separately: select a client/name for a new boo
 
 ## Stack and architecture
 
-Node.js >=22.13, npm workspaces, React 19.2, React Router 7, Vite 7, Tailwind CSS 4, Express 5, better-sqlite3 12.4 and Playwright 1.56. No external services or new charting dependencies are required.
+Node.js >=22.13, npm workspaces, React 19.2, React Router 7, Vite 7, Tailwind CSS 4, Express 5, better-sqlite3 12.4, bcryptjs 3.0.3 and Playwright 1.56. No external services or charting dependencies are required.
 
 - `client/src/pages/`: overview, clients, request creation/list/details, daily schedule, resources and simulation.
 - `client/src/components/`: shared forms/feedback, lifecycle actions, recommendations and SVG timelines.
@@ -70,14 +71,32 @@ Node.js >=22.13, npm workspaces, React 19.2, React Router 7, Vite 7, Tailwind CS
 - `server/src/db/`: schema, connections, additive initialization and official data seeding.
 - `server/tests/`, `e2e/`: isolated database/API/concurrency and real-browser verification.
 
-SQLite stores clients, venues, halls, bookings and recommendation confirmation keys. Foreign keys, status/interval/type checks and date/status/hall/venue indexes are enabled. WAL and a five-second busy timeout are configured. Resource usage is derived, never stored as mutable counters. Startup creates missing schema and upserts official inventory; it never deletes clients or bookings. Manual inventory edits are reasserted to the official dataset at startup.
+SQLite stores clients, venues, halls, bookings, recommendation confirmation keys, users, sessions and login-attempt buckets. Foreign keys, status/interval/type checks and indexes are enabled. WAL and a five-second busy timeout are configured. Resource usage is derived, never stored as mutable counters. Startup additively creates missing schema and missing official inventory while preserving existing inventory, clients, bookings, keys and accounts.
+
+## Accounts and access
+
+The public website is `/`; the protected dashboard is `/app`. Existing `/bookings`, `/clients`, `/schedule`, `/resources` and `/simulation` URLs remain protected and functional. `/venues`, `/profile`, `/settings` and administrator-only `/users` complete the workspace. Unauthenticated deep links go to login and return to a validated internal destination after authentication.
+
+Event clients are customers, not login users. Authorized ADMIN and STAFF accounts share the organization's existing event records; no tenant isolation or per-booking ownership is claimed. There is no public signup endpoint.
+
+For a new installation, run `npm run admin:bootstrap` from the root. Supply your own name, email and password in the interactive terminal; password entry is hidden. This command creates the first administrator only and refuses to run after accounts exist. No default password is shipped. Administrators create STAFF accounts at **Staff accounts** and arrange a secure credential handover. Staff can change their password in Settings.
+
+Passwords use salted bcrypt with cost 12. New passwords require at least 12 Unicode characters, must not be whitespace-only, and cannot exceed bcrypt's 72 UTF-8 byte limit. Passwords/hashes never appear in ordinary account responses. Session credentials are random opaque values in HttpOnly, SameSite=Strict cookies; only token hashes are stored server-side. Sessions expire absolutely after eight hours. Password changes and operator recovery revoke all sessions; disabling staff revokes theirs. Logout invalidates the session, clears its cookie and loads a fresh public document to discard authenticated React state and pending requests.
+
+There is no email recovery service. A trusted server operator can run `npm run admin:recover`, supply the account email and enter a new password privately. These CLI operations require access to the server and its database. Keep the database and terminal restricted to trusted operators. Advanced automation can use `-- --stdin` with protected JSON input; never put passwords in command arguments or commit credentials.
+
+State-changing HTTP requests must include the configured browser Origin or the request's exact same origin. Cookies are sent automatically by the same-origin frontend API client. Login attempts are bounded per IP/account and per IP in persistent 15-minute windows. This is targeted application security, not a comprehensive audit or a production certification. See [Phase 6 security and configuration report](docs/PHASE6.md).
 
 ## Main API endpoints
 
-All successful results use `{data: ...}`; failures use `{error: {code, message, details?}}`.
+All successful results use `{data: ...}`; failures use `{error: {code, message, details?}}`. Operational endpoints require a valid session. Health and login remain public; logout can clear an absent/expired cookie.
 
 | Endpoint | Purpose |
 | --- | --- |
+| `POST /api/auth/login`, `POST /api/auth/logout` | Establish/invalidate the cookie session |
+| `GET /api/auth/me`, `PATCH /api/auth/profile` | Session restoration and display-name update |
+| `POST /api/auth/change-password` | Verify current password, change it and revoke sessions |
+| `GET/POST /api/users`, `PATCH /api/users/:id/status` | ADMIN-only staff provisioning/list/status |
 | `GET /api/health` | SQLite health check |
 | `GET/POST /api/clients` | List/create clients |
 | `GET /api/venues` | Venues, halls and shared inventory |
@@ -92,7 +111,7 @@ All successful results use `{data: ...}`; failures use `{error: {code, message, 
 | `GET /api/analytics/resources?venueId=1&date=2030-03-20` | Venue/date resource intelligence |
 | `POST /api/simulation` | Read-only new/existing what-if evaluation |
 
-Exact contracts: [API documentation](docs/API.md), [Phase 4](docs/PHASE4.md), [Phase 5](docs/PHASE5.md).
+Exact contracts: [API documentation](docs/API.md), [Phase 4](docs/PHASE4.md), [Phase 5](docs/PHASE5.md), [Phase 6](docs/PHASE6.md).
 
 ## Installation and development
 
@@ -101,12 +120,13 @@ Use Node.js 22.13 or newer and npm. From the repository root:
 ```sh
 npm ci
 npm run db:init
+npm run admin:bootstrap
 npm run dev
 ```
 
-UI: http://localhost:5173. API: http://localhost:3001/api/health. Vite proxies `/api` to Express. Ctrl+C stops both processes. Alternatively use `npm run dev:server` and `npm run dev:client` in separate terminals. Native SQLite builds may require platform build tools if no prebuilt binary is available.
+Public homepage: http://localhost:5173. Log in at `/login`, then open `/app`. API health: http://localhost:3001/api/health. Vite proxies `/api` to Express. Ctrl+C stops both processes. Alternatively use `npm run dev:server` and `npm run dev:client` in separate terminals. Native SQLite builds may require platform build tools if no prebuilt binary is available.
 
-Optionally copy `.env.example` to `.env`. No secrets are needed. Default database: `server/data/eventsync.sqlite`. Relative `DB_PATH` values resolve from `server/`. If changing `PORT`, update `API_PROXY_TARGET` and restart both services. `VENUE_TIME_ZONE` defaults to UTC; this local workspace uses `Asia/Kolkata`. Event dates/times are venue-local civil values and are never timezone-converted; audit timestamps use UTC.
+Optionally copy `.env.example` to `.env`. Default database: `server/data/eventsync.sqlite`. Relative `DB_PATH` values resolve from `server/`. Set `APP_ORIGIN` to the actual frontend origin (default `http://localhost:5173`); update it if using a different host/port. If changing `PORT`, update `API_PROXY_TARGET` and restart both services. For deployment, use HTTPS, `NODE_ENV=production` and an HTTPS `APP_ORIGIN`; production startup rejects an HTTP application origin and enables Secure cookies. `VENUE_TIME_ZONE` defaults to UTC; this local workspace uses `Asia/Kolkata`. Event dates/times are venue-local civil values and are never timezone-converted; audit timestamps use UTC.
 
 For a production-style local check, run `npm run build`, then `npm start` and open http://localhost:3001. Express serves the built frontend and React route fallback; unknown API routes remain JSON 404 errors. Rebuild before restarting to pick up frontend changes.
 
@@ -123,8 +143,11 @@ For a production-style local check, run `npm run build`, then `npm start` and op
 | `npm run test:e2e` | Real-browser workflows on isolated ports 3101/5174 |
 | `npm run demo:reset` | Explicitly replace only the dedicated demonstration dataset |
 | `npm run demo:dev` | Start development services against the demonstration database |
+| `npm run admin:bootstrap` | Create the first administrator in the configured database |
+| `npm run admin:recover` | Operator-assisted password reset and session revocation |
+| `npm run demo:admin` | First-admin setup for the dedicated demo database |
 
-On managed environments, sockets, workers or browser execution may require permitted execution outside the command sandbox. `PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH` optionally selects an installed Chromium; use your shell's syntax to set it. Test databases are isolated from development/demo records. Latest actual results and limitations are in [Phase 5 report](docs/PHASE5.md).
+On managed environments, sockets, workers or browser execution may require permitted execution outside the command sandbox. `PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH` optionally selects an installed Chromium; use your shell's syntax to set it. Test databases and randomly generated test accounts are isolated from development/demo records. Existing HTTP/browser tests authenticate through legitimate fixtures. Latest actual results and limitations are in [Phase 6 report](docs/PHASE6.md).
 
 ## Demonstration workflow
 
@@ -132,15 +155,16 @@ Stop any running development services, then:
 
 ```sh
 npm run demo:reset
+npm run demo:admin
 npm run demo:dev
 ```
 
-Reset affects only `server/data/eventsync-demo.sqlite`, regardless of `DB_PATH`. It does not reset the normal development database. Do not reset the demo while its server is running. The verified manifest is written to `server/data/demo-manifest.json`.
+Reset affects only event demonstration records in `server/data/eventsync-demo.sqlite`, regardless of `DB_PATH`. It does not reset the normal development database or delete accounts/sessions. Run `demo:admin` only when that demo has no accounts; use operator recovery for an existing account. Do not reset the demo while its server is running. The verified manifest is written to `server/data/demo-manifest.json`. Log in with the administrator account you supplied.
 
 Open Resources, select **2030-03-20 / Venue A / 10:00** for two occupied halls and peaks of **2 projectors, 2 audio systems and 5 staff**. Open the conference, explore a what-if move and compare results. Inspect rejected history, search alternatives, and demonstrate cancellation or atomic rescheduling. Full reproducible steps for all 13 scenarios: [Demo guide](docs/DEMO.md).
 
 ## Limitations and delivery status
 
-The official PDF was unavailable. Authentication, payments, waitlists, cloud infrastructure and subsequent phases are not implemented. The servers bind to all interfaces; use a controlled local network. No comprehensive security audit, production load test or production-scale claim is made.
+The official PDF was unavailable. Payments, waitlists, cloud infrastructure and subsequent phases are not implemented. The servers bind to all interfaces; use a controlled local network and HTTPS for deployment. No comprehensive security audit, production load test or production-scale claim is made. MFA, email verification, automated recovery and invitation delivery are not implemented; access is controlled through the administrator/CLI model.
 
 Recommendation search is bounded and may miss unsampled minutes. Simulations and analytics are snapshots, not live reservations. General client/booking lists remain unpaginated. Confirmation keys have no expiry. Windows was verified locally; other platforms were not reverified for Phase 5. Historical reports remain available in `docs/` and describe their respective implementation stages.

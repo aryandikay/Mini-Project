@@ -24,6 +24,8 @@ async function request(path, options) {
     );
     error.code = payload.error?.code;
     error.details = payload.error?.details;
+    error.status = response.status;
+    if (error.code === "AUTH_REQUIRED" && path !== "/auth/me") window.dispatchEvent(new Event("eventsync:unauthorized"));
     throw error;
   }
   if (!Object.hasOwn(payload, "data"))
@@ -31,6 +33,14 @@ async function request(path, options) {
   return payload.data;
 }
 export const api = {
+  me: () => request("/auth/me"),
+  login: (body) => request("/auth/login", { method: "POST", body: JSON.stringify(body) }),
+  logout: () => request("/auth/logout", { method: "POST", body: "{}" }),
+  updateProfile: (name) => request("/auth/profile", { method: "PATCH", body: JSON.stringify({ name }) }),
+  changePassword: (body) => request("/auth/change-password", { method: "POST", body: JSON.stringify(body) }),
+  users: () => request("/users"),
+  createStaff: (body) => request("/users", { method: "POST", body: JSON.stringify(body) }),
+  userStatus: (id, active) => request(`/users/${id}/status`, { method: "PATCH", body: JSON.stringify({ active }) }),
   resources: (filters) => request(`/analytics/resources?${new URLSearchParams(filters)}`),
   simulate: (body) => request("/simulation", { method: "POST", body: JSON.stringify(body) }),
   recommendations: (body) => request("/recommendations", { method: "POST", body: JSON.stringify(body) }),

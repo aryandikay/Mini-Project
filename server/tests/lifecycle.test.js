@@ -8,6 +8,7 @@ import { openDatabase } from "../src/db/connection.js";
 import { createRepository } from "../src/repositories/index.js";
 import { createService } from "../src/services/index.js";
 import { createApp } from "../src/app.js";
+import { authenticatedHeaders } from "../test-support/auth.js";
 import { venueNow } from "../src/utils/venueClock.js";
 const input = {
   clientId: 1,
@@ -218,13 +219,14 @@ test("HTTP lifecycle contracts, malformed IDs, missing records, filters and conf
   const { db } = setup(t);
   const server = createApp(db).listen(0, "127.0.0.1");
   await new Promise((r) => server.once("listening", r));
+  const headers = await authenticatedHeaders(db, `http://127.0.0.1:${server.address().port}`);
   t.after(() => new Promise((r) => server.close(r)));
   async function call(path, method = "GET", body) {
     const res = await fetch(
       `http://127.0.0.1:${server.address().port}/api${path}`,
       {
         method,
-        headers: { "Content-Type": "application/json" },
+        headers,
         body: body === undefined ? undefined : JSON.stringify(body),
       },
     );

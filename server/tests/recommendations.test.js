@@ -6,6 +6,7 @@ import { createService } from "../src/services/index.js";
 import { allocate } from "../src/services/scheduler.js";
 import { normalizeSchedule, candidateDates, candidateTimes, rankRecommendations, searchOptions } from "../src/services/recommendations.js";
 import { createApp } from "../src/app.js";
+import { authenticatedHeaders } from "../test-support/auth.js";
 import { Worker } from "node:worker_threads";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -288,9 +289,10 @@ test("API validates, returns real/empty snapshots, confirms via booking endpoint
   const { db, service, repo } = setup(t);
   const server = createApp(db).listen(0, "127.0.0.1");
   await new Promise((resolve) => server.once("listening", resolve));
+  const headers = await authenticatedHeaders(db, `http://127.0.0.1:${server.address().port}`);
   const post = async (path, body) => {
     const res = await fetch(`http://127.0.0.1:${server.address().port}/api${path}`, {
-      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+      method: "POST", headers, body: JSON.stringify(body) });
     return { status: res.status, body: await res.json() };
   };
   try {

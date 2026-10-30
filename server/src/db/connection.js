@@ -33,7 +33,7 @@ export function openDatabase(
         );
       }
     }).immediate();
-    seed(db);
+    seed(db, true);
     return db;
   } catch (error) {
     db.close();

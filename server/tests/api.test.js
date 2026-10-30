@@ -6,9 +6,10 @@ import { join } from "node:path";
 import { openDatabase } from "../src/db/connection.js";
 import { seed } from "../src/db/seed.js";
 import { createApp } from "../src/app.js";
+import { authenticatedHeaders } from "../test-support/auth.js";
 const directory = mkdtempSync(join(tmpdir(), "eventsync-test-"));
 const path = join(directory, "test.sqlite");
-let db, server, base, client, venue, booking;
+let db, server, base, client, venue, booking, authHeaders;
 async function start() {
   db = openDatabase(path);
   server = createApp(db).listen(0, "127.0.0.1");
@@ -17,6 +18,7 @@ async function start() {
     server.once("error", reject);
   });
   base = `http://127.0.0.1:${server.address().port}`;
+  authHeaders = await authenticatedHeaders(db, base);
 }
 async function stop() {
   await new Promise((resolve) => server.close(resolve));
@@ -29,7 +31,7 @@ async function request(
 ) {
   const response = await fetch(`${base}/api${route}`, {
     method,
-    headers: { "Content-Type": "application/json" },
+    headers: authHeaders,
     body: body === undefined ? undefined : JSON.stringify(body),
   });
   return { status: response.status, body: await response.json() };
@@ -257,7 +259,7 @@ test("database constraints defend status, foreign keys, intervals, integers and 
 test("JSON and missing-route errors use safe consistent envelopes", async () => {
   const response = await fetch(`${base}/api/bookings`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: authHeaders,
     body: "{invalid",
   });
   assert.equal(response.status, 400);

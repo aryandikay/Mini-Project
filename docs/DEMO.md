@@ -4,10 +4,11 @@ Run with Node >=22.13 after `npm ci` and `npx playwright install chromium` if br
 
 ```sh
 npm run demo:reset
+npm run demo:admin
 npm run demo:dev
 ```
 
-Open http://localhost:5173. The reset command explicitly resets only `server/data/eventsync-demo.sqlite`, ignores `DB_PATH`, builds scenarios using real services and asserts actual outcomes. Failure rolls back the reset transaction. It does not delete database files or touch `server/data/eventsync.sqlite`. The launch command uses the dedicated path and refuses to run if it has not been initialized. Do not reset while a demo server is running. Restart with `npm run dev` to return to normal development data.
+Open http://localhost:5173 and log in with the account you supplied to the hidden-password `demo:admin` prompt. That bootstrap command is required only once per demo database. No default credentials are provided. The reset command explicitly resets only event records in `server/data/eventsync-demo.sqlite`, ignores `DB_PATH`, builds scenarios using real services and asserts actual outcomes. It preserves accounts/sessions. Failure rolls back the reset transaction. It does not delete database files or touch `server/data/eventsync.sqlite`. The launch command uses the dedicated path and refuses to run if it has not been initialized. Do not reset while a demo server is running. Restart with `npm run dev` to return to normal development data. The authenticated dashboard is `/app`; the public homepage is `/`.
 
 The fixed date is 2030-03-20; use the date selectors even if the current calendar date differs. Initial records are deterministic, with 10 CONFIRMED, one REJECTED and one CANCELLED request. IDs below match a fresh reset; the generated `server/data/demo-manifest.json` is authoritative.
 

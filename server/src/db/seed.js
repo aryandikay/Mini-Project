@@ -31,13 +31,13 @@ const dataset = [
     ],
   ],
 ];
-export function seed(db) {
+export function seed(db, preserveExisting = false) {
   db.transaction(() => {
     const venue = db.prepare(
-      "INSERT INTO venues(name,total_projectors,total_audio_systems,total_staff) VALUES(?,?,?,?) ON CONFLICT(name) DO UPDATE SET total_projectors=excluded.total_projectors,total_audio_systems=excluded.total_audio_systems,total_staff=excluded.total_staff RETURNING id",
+      `INSERT INTO venues(name,total_projectors,total_audio_systems,total_staff) VALUES(?,?,?,?) ON CONFLICT(name) DO UPDATE SET ${preserveExisting ? "name=excluded.name" : "total_projectors=excluded.total_projectors,total_audio_systems=excluded.total_audio_systems,total_staff=excluded.total_staff"} RETURNING id`,
     );
     const hall = db.prepare(
-      "INSERT INTO halls(venue_id,name,capacity) VALUES(?,?,?) ON CONFLICT(venue_id,name) DO UPDATE SET capacity=excluded.capacity",
+      `INSERT INTO halls(venue_id,name,capacity) VALUES(?,?,?) ON CONFLICT(venue_id,name) ${preserveExisting ? "DO NOTHING" : "DO UPDATE SET capacity=excluded.capacity"}`,
     );
     for (const [name, projectors, audio, staff, halls] of dataset) {
       const { id } = venue.get(name, projectors, audio, staff);

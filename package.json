@@ -21,7 +21,10 @@
     "db:seed": "npm run db:seed -w server",
     "test:e2e": "playwright test",
     "demo:reset": "node scripts/demo.js --reset",
-    "demo:dev": "node scripts/demo-dev.js"
+    "demo:dev": "node scripts/demo-dev.js",
+    "admin:bootstrap": "node --env-file-if-exists=.env scripts/accounts.js bootstrap",
+    "admin:recover": "node --env-file-if-exists=.env scripts/accounts.js recover",
+    "demo:admin": "node scripts/demo-account.js"
   },
   "devDependencies": {
     "@playwright/test": "1.56.1"

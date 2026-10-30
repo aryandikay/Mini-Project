@@ -1119,3 +1119,139 @@ footer {
 }
 
 @media (max-width: 760px) { .brand small { font-size: 7px; letter-spacing: 1.4px; } .stat p { padding-right: 24px; min-height: 28px; } }
+
+/* Phase 6 public website and authenticated workspace share the existing palette. */
+.skip-link { position: fixed; left: 16px; top: -80px; z-index: 100; padding: 12px 18px; color: white; background: #225a49; }
+.skip-link:focus { top: 12px; }
+.public-site { max-width: 1600px; margin: auto; background: #f8f9f5; }
+.public-header { min-height: 100px; padding: 22px 6%; display: flex; align-items: center; justify-content: space-between; gap: 24px; border-bottom: 1px solid #dfe5dc; background: #fff; }
+.public-header nav { display: flex; align-items: center; gap: 28px; font-size: 13px; }
+.public-header nav a:not(.button):hover, .public-footer nav a:hover { color: #225a49; text-decoration: underline; }
+.public-menu-button { display: none; }
+#public-main { padding: 0; }
+.landing-hero { display: grid; grid-template-columns: 1.12fr 1fr; gap: 7%; align-items: center; padding: 88px 6% 76px; }
+.landing-hero h1 { font-size: clamp(44px, 4.8vw, 72px); line-height: 1.06; letter-spacing: -2.6px; margin: 22px 0; }
+.landing-hero h1 em, .auth-introduction h1 em { color: #687b53; font-weight: 400; }
+.hero-description { max-width: 500px; font-size: 17px; line-height: 1.85; color: #59695d; }
+.hero-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 25px; margin: 30px 0 18px; }
+.hero-note { color: #647463; font-size: 11px; }
+.reservation-illustration { border: 1px solid #cfdccf; border-radius: 18px; padding: 32px; background: #edf1e7; box-shadow: 16px 20px 0 #e3e9dc; transform: rotate(-1deg); }
+.illustration-heading { display: flex; justify-content: space-between; font-size: 10px; letter-spacing: 1.6px; margin-bottom: 48px; color: #526a51; }
+.reservation-illustration h2 { font-family: Georgia, serif; font-size: 34px; font-weight: 400; margin-bottom: 14px; }
+.reservation-illustration p { font-size: 14px; line-height: 1.8; color: #59695d; }
+.illustration-plan { margin: 30px 0; padding: 20px 0; border-top: 1px solid #cbd7c5; border-bottom: 1px solid #cbd7c5; }
+.illustration-plan > div:first-child { display: flex; justify-content: space-between; font-size: 10px; margin-bottom: 12px; }
+.illustration-reservation { display: flex; align-items: stretch; text-align: center; font-size: 10px; min-height: 58px; }
+.illustration-reservation > * { display: flex; justify-content: center; align-items: center; padding: 8px; }
+.illustration-reservation span { flex: 1; background: #cfddc6; color: #364e37; }
+.illustration-reservation strong { flex: 3; background: #225a49; color: white; }
+.reservation-illustration dl { margin: 0 0 25px; }
+.reservation-illustration dl div { display: flex; justify-content: space-between; gap: 15px; padding: 8px 0; font-size: 11px; }
+.reservation-illustration dd { margin: 0; text-align: right; font-weight: 600; }
+.reservation-illustration small { display: block; color: #677760; font-size: 10px; }
+.landing-principles { display: flex; align-items: center; justify-content: space-between; gap: 20px; padding: 25px 6%; border-block: 1px solid #dfe5dc; color: #566a54; font-size: 10px; letter-spacing: 1.4px; }
+.landing-section { padding: 90px 6%; scroll-margin-top: 20px; }
+.landing-section-heading { max-width: 630px; margin-bottom: 45px; }
+.landing-section h2, .landing-workflow h2, .landing-cta h2 { font-family: Georgia, serif; font-weight: 400; font-size: clamp(34px, 3.2vw, 48px); line-height: 1.15; margin: 18px 0; }
+.landing-section-heading > p:last-child, .landing-workflow > div > p, .landing-cta > p { line-height: 1.8; color: #5b6b5e; }
+.feature-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); border: 1px solid #dbe3d5; border-radius: 12px; overflow: hidden; background: #fff; }
+.feature-grid article { padding: 28px; border-right: 1px solid #e4e9df; border-bottom: 1px solid #e4e9df; }
+.feature-grid article > span { display: block; color: #788769; font-size: 11px; margin-bottom: 25px; }
+.feature-grid h3 { font-size: 17px; margin-bottom: 12px; }
+.feature-grid p { font-size: 12px; line-height: 1.8; color: #62715f; }
+.landing-workflow { display: grid; grid-template-columns: 1fr 1fr; gap: 10%; padding: 70px 6%; background: #eaf0e3; scroll-margin-top: 20px; }
+.landing-workflow .button { margin-top: 24px; }
+.landing-workflow ol { list-style: none; counter-reset: steps; padding: 0; margin: 0; }
+.landing-workflow li { counter-increment: steps; position: relative; padding: 22px 0 24px 50px; border-bottom: 1px solid #cdd9c5; }
+.landing-workflow li::before { content: '0' counter(steps); position: absolute; left: 0; top: 26px; font-size: 12px; color: #5c7453; }
+.landing-workflow li p { font-size: 13px; color: #5b6b5e; line-height: 1.8; margin-top: 10px; }
+.landing-cta { text-align: center; padding: 80px 6%; }
+.landing-cta .button { margin-top: 28px; }
+.public-footer { margin: 0; padding: 45px 6% 30px; display: grid; grid-template-columns: 1fr auto; gap: 28px; align-items: start; }
+.public-footer p { max-width: 360px; line-height: 1.8; color: #65725f; font-size: 12px; margin-top: 20px; }
+.public-footer nav { display: grid; gap: 14px; font-size: 12px; }
+.public-footer small { grid-column: 1/-1; font-size: 10px; color: #65725f; }
+.auth-section { display: grid; grid-template-columns: 1fr 1fr; gap: 9%; padding: 80px 9%; align-items: center; min-height: 650px; }
+.auth-introduction h1 { font-size: 58px; margin: 20px 0; }
+.auth-introduction p:not(.eyebrow) { color: #5e6e5e; line-height: 1.9; max-width: 350px; margin-bottom: 30px; }
+.auth-introduction > a { font-size: 12px; text-decoration: underline; }
+.auth-card { padding: 35px; }
+.auth-card .button { width: 100%; }
+.access-section { padding: 70px 6%; min-height: 440px; }
+.access-section h1 { margin: 20px 0 40px; }
+.access-section .panel p { line-height: 1.85; margin: 16px 0; }
+code { overflow-wrap: anywhere; }
+.workspace-layout { display: grid; grid-template-columns: 230px minmax(0, 1fr); min-height: 100vh; max-width: 1800px; margin: auto; }
+.workspace-sidebar { background: #fff; border-right: 1px solid #dce4d6; padding: 32px 22px; position: sticky; top: 0; height: 100vh; overflow-y: auto; }
+.workspace-sidebar .brand { font-size: 25px; }
+.sidebar-caption { font-size: 8px; letter-spacing: 1.5px; margin: 38px 0 18px; color: #677761; }
+.workspace-sidebar nav { display: flex; flex-direction: column; gap: 3px; }
+.workspace-sidebar nav a { display: flex; gap: 13px; align-items: center; padding: 12px 14px; min-height: 43px; font-size: 12px; color: #657263; border-radius: 6px; }
+.workspace-sidebar nav a > span { width: 17px; font-size: 17px; }
+.workspace-sidebar nav a.active { background: #eaf1e4; color: #215843; font-weight: 600; }
+.workspace-sidebar nav a:hover { background: #f1f5ec; }
+.sidebar-public { display: block; margin-top: 26px; font-size: 11px; color: #5a7053; }
+.workspace-body { min-width: 0; }
+.workspace-topbar { display: flex; justify-content: space-between; align-items: center; gap: 15px; padding: 20px 36px; min-height: 88px; background: #fff; border-bottom: 1px solid #dce4d6; }
+.workspace-topbar > div > strong { display: block; font-size: 16px; margin-top: 6px; }
+.workspace-topbar .eyebrow { font-size: 8px; }
+.account-menu { position: relative; font-size: 12px; max-width: 210px; }
+.account-menu summary { cursor: pointer; padding: 12px 14px; border: 1px solid #dce4d6; border-radius: 7px; overflow-wrap: anywhere; }
+.account-menu > div { position: absolute; right: 0; top: calc(100% + 8px); width: 220px; padding: 10px; background: #fff; border: 1px solid #dce4d6; border-radius: 8px; box-shadow: 0 12px 25px #263a3614; z-index: 20; display: grid; gap: 4px; }
+.account-menu a, .account-menu button, .account-menu div > span { padding: 12px; text-align: left; }
+.account-menu div > span { font-size: 10px; color: #677761; }
+.account-menu a:hover, .account-menu button:hover { background: #edf3e7; }
+.workspace-menu-button { display: none; }
+.workspace-body .workspace-strip { margin: 0 36px; }
+.workspace-body main { padding: 30px 36px 50px; }
+.workspace-body footer { margin: 0 36px; flex-wrap: wrap; gap: 12px; }
+.session-loading { padding: 70px 8%; max-width: 700px; margin: auto; }
+.account-form { max-width: 600px; }
+.account-form > p, .staff-row p { line-height: 1.8; }
+.staff-row { padding: 20px 0; border-bottom: 1px solid #e0e7d8; overflow-wrap: anywhere; }
+.staff-row .button { margin-top: 12px; }
+@media (max-width: 1100px) {
+  .feature-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .public-header nav { gap: 16px; }
+  .landing-hero { gap: 5%; padding-top: 60px; }
+  .reservation-illustration { padding: 25px; }
+  .workspace-layout { grid-template-columns: 205px minmax(0, 1fr); }
+  .workspace-sidebar { padding: 28px 15px; }
+  .workspace-body main { padding-inline: 24px; }
+  .workspace-topbar { padding-inline: 24px; }
+  .workspace-body .workspace-strip, .workspace-body footer { margin-inline: 24px; }
+}
+@media (max-width: 760px) {
+  .public-header { flex-wrap: wrap; min-height: 88px; padding: 20px 5%; gap: 18px; }
+  .public-menu-button { display: inline-flex; }
+  .public-header nav { display: none; width: 100%; }
+  .public-header nav.is-open { display: flex; flex-direction: column; align-items: stretch; gap: 0; }
+  .public-header nav a { padding: 15px; }
+  .landing-hero { grid-template-columns: 1fr; padding: 50px 6% 55px; gap: 45px; }
+  .landing-hero h1 { font-size: 47px; letter-spacing: -1.8px; }
+  .hero-description { font-size: 15px; }
+  .reservation-illustration { transform: none; box-shadow: 8px 10px 0 #e3e9dc; }
+  .illustration-heading { margin-bottom: 30px; }
+  .landing-principles { flex-wrap: wrap; justify-content: center; font-size: 9px; gap: 14px; }
+  .landing-principles > span { display: none; }
+  .landing-section { padding: 55px 6%; }
+  .feature-grid { grid-template-columns: 1fr; }
+  .feature-grid article { padding: 25px; }
+  .landing-workflow { grid-template-columns: 1fr; gap: 35px; padding: 50px 6%; }
+  .landing-cta { padding: 55px 6%; }
+  .public-footer { grid-template-columns: 1fr; }
+  .auth-section { grid-template-columns: 1fr; padding: 45px 6%; gap: 30px; min-height: 0; }
+  .auth-introduction h1 { font-size: 43px; }
+  .auth-card { padding: 25px; }
+  .workspace-layout { display: flex; flex-direction: column; }
+  .workspace-sidebar { display: none; position: static; width: 100%; height: auto; max-height: 75vh; border-bottom: 1px solid #dce4d6; }
+  .workspace-sidebar.is-open { display: block; }
+  .workspace-menu-button { display: inline-flex; min-height: 44px; }
+  .workspace-topbar { padding: 16px 5%; }
+  .workspace-topbar > div { display: none; }
+  .account-menu { max-width: 200px; }
+  .workspace-body main { padding: 28px 5% 40px; }
+  .workspace-body .workspace-strip, .workspace-body footer { margin-inline: 5%; }
+  .workspace-sidebar nav a { min-height: 46px; }
+  .access-section { padding: 40px 6%; }
+}

@@ -54,3 +54,25 @@ CREATE TABLE IF NOT EXISTS recommendation_confirmations (
   request_fingerprint TEXT NOT NULL,
   booking_id INTEGER NOT NULL REFERENCES bookings(id)
 );
+CREATE TABLE IF NOT EXISTS users (
+  id INTEGER PRIMARY KEY,
+  name TEXT NOT NULL CHECK(length(trim(name)) BETWEEN 1 AND 120),
+  email TEXT NOT NULL UNIQUE CHECK(email=lower(trim(email)) AND length(email) BETWEEN 3 AND 254),
+  password_hash TEXT NOT NULL,
+  role TEXT NOT NULL CHECK(role IN ('ADMIN','STAFF')),
+  active INTEGER NOT NULL DEFAULT 1 CHECK(active IN (0,1)),
+  created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+  updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
+);
+CREATE TABLE IF NOT EXISTS sessions (
+  token_hash TEXT PRIMARY KEY,
+  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  expires_at INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS sessions_user ON sessions(user_id);
+CREATE INDEX IF NOT EXISTS sessions_expiry ON sessions(expires_at);
+CREATE TABLE IF NOT EXISTS login_attempts (
+  bucket TEXT PRIMARY KEY,
+  attempts INTEGER NOT NULL,
+  resets_at INTEGER NOT NULL
+);

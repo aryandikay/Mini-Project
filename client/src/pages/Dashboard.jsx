@@ -1,7 +1,8 @@
+import VenueDirectory from "../components/VenueDirectory.jsx";
 import { Link } from "react-router-dom";
 import { PageTitle, Empty } from "../components/Common.jsx";
 import { RequestCards } from "../components/RequestCards.jsx";
-export default function Dashboard({ venues, bookings, dashboard }) {
+export default function Dashboard({ venues, bookings, dashboard, user }) {
   const stats = [
     ["Venues", dashboard.totalVenues, "Across the event campus"],
     ["Halls", dashboard.totalHalls, "Event spaces"],
@@ -23,7 +24,7 @@ export default function Dashboard({ venues, bookings, dashboard }) {
           </Link>
         }
       >
-        Your venues, people and event requests, together in one place.
+        Welcome, {user?.name}. Your venues, people and event requests, together in one place.
       </PageTitle>
       <section className="planning-tools" aria-label="Planning tools">
         <Link className="panel" to="/resources"><h2>Resource intelligence & timeline →</h2><p>Inspect hall reservations and shared-resource demand by venue and date.</p></Link>
@@ -49,55 +50,7 @@ export default function Dashboard({ venues, bookings, dashboard }) {
           </div>
           <span className="section-label">VENUE DIRECTORY</span>
         </div>
-        <div className="venue-grid">
-          {venues.map((v, i) => (
-            <article className={`venue-card venue-${i}`} key={v.id}>
-              <div className="venue-art" aria-hidden="true">
-                <span className="venue-letter">
-                  {v.name.replace("Venue ", "")}
-                </span>
-                <div className="building">
-                  <i />
-                  <i />
-                  <i />
-                  <i />
-                  <i />
-                  <i />
-                </div>
-                <span className="art-caption">THE EVENT CAMPUS</span>
-              </div>
-              <div className="venue-body">
-                <div className="venue-title">
-                  <h3>{v.name}</h3>
-                  <span>{v.halls.length} halls</span>
-                </div>
-                <div className="hall-list">
-                  {v.halls.map((h) => (
-                    <div key={h.id}>
-                      <span>{h.name}</span>
-                      <strong>
-                        {h.capacity}
-                        <small> guests</small>
-                      </strong>
-                    </div>
-                  ))}
-                </div>
-                <p className="inventory-label">SHARED VENUE INVENTORY</p>
-                <div className="inventory">
-                  <span>
-                    <b>{v.totalProjectors}</b> Projectors
-                  </span>
-                  <span>
-                    <b>{v.totalAudioSystems}</b> Audio
-                  </span>
-                  <span>
-                    <b>{v.totalStaff}</b> Staff
-                  </span>
-                </div>
-              </div>
-            </article>
-          ))}
-        </div>
+        <VenueDirectory venues={venues} />
         <p className="footnote">
           Inventory is shared between halls. Availability is assessed during
           allocation.

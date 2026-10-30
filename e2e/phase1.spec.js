@@ -4,9 +4,16 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { fileURLToPath } from "node:url";
+import { randomBytes } from "node:crypto";
+import { openDatabase } from "../server/src/db/connection.js";
+import { authService } from "../server/src/services/auth.js";
+import { authRepository } from "../server/src/repositories/auth.js";
 const root = fileURLToPath(new URL("../", import.meta.url));
 let directory, apiProcess, viteProcess;
 const errors = [];
+const account = { name: "Browser organizer", email: "organizer@browser.invalid", password: randomBytes(24).toString("base64url") };
+const browserOrigin = "http://127.0.0.1:5174";
+test.use({ extraHTTPHeaders: { Origin: browserOrigin } });
 async function start(args, cwd, env, url) {
   let output = "";
   const child = spawn(process.execPath, args, {
@@ -44,12 +51,14 @@ async function startApi() {
   return start(
     ["server/src/index.js"],
     root,
-    { PORT: "3101", DB_PATH: join(directory, "e2e.sqlite") },
+    { PORT: "3101", DB_PATH: join(directory, "e2e.sqlite"), APP_ORIGIN: browserOrigin },
     "http://127.0.0.1:3101/api/health",
   );
 }
 test.beforeAll(async () => {
   directory = mkdtempSync(join(tmpdir(), "eventsync-browser-"));
+  const db = openDatabase(join(directory, "e2e.sqlite"));
+  try { await authService(authRepository(db)).bootstrap(account); } finally { db.close(); }
   apiProcess = await startApi();
   viteProcess = await start(
     [
@@ -65,6 +74,11 @@ test.beforeAll(async () => {
     "http://127.0.0.1:5174",
   );
 });
+
+test.beforeEach(async ({ page }) => {
+  const response = await page.request.post("/api/auth/login", { data: { email: account.email, password: account.password } });
+  expect(response.ok()).toBe(true);
+});
 test.afterAll(async () => {
   await stop(viteProcess);
   await stop(apiProcess);
@@ -74,7 +88,7 @@ test("real UI client → confirmed booking → detail → restart persistence; d
   page,
 }) => {
   page.on("pageerror", (error) => errors.push(error.message));
-  await page.goto("/");
+  await page.goto("/app");
   await expect(
     page.getByRole("heading", { name: "A little planning. A great event." }),
   ).toBeVisible();
@@ -156,6 +170,7 @@ test("real UI client → confirmed booking → detail → restart persistence; d
     page.getByRole("heading", { name: "Campus Innovation Day" }),
   ).toBeVisible();
   await page.setViewportSize({ width: 390, height: 844 });
+  await page.getByRole("button", { name: "Menu", exact: true }).click();
   await page.getByRole("link", { name: "Overview", exact: true }).click();
   await expect(
     page.getByRole("heading", { name: "Venue C", exact: true }),
@@ -182,7 +197,7 @@ test("network failure is visible and retry recovers real backend data", async ({
   page,
 }) => {
   await page.route("**/api/venues", (route) => route.abort());
-  await page.goto("/");
+  await page.goto("/app");
   await expect(page.getByRole("alert")).toContainText(
     "Unable to reach EventSync",
   );
@@ -336,7 +351,7 @@ async function recommendationFixture(page, prefix, eventDate) {
 }
 
 test("rejected request finds real alternatives, handles stale venue, confirms once and preserves history", async ({ page }) => {
-  await page.goto("/");
+  await page.goto("/app");
   const input = await recommendationFixture(page, "Phase 4 rejected event", "2098-04-01");
   await apiData(page, "/bookings", { ...input, eventName: "All-day constraint", startTime: "08:30", endTime: "21:30" });
   // Exercise the actual request form and its persisted-rejection navigation.
@@ -393,7 +408,7 @@ test("rejected request finds real alternatives, handles stale venue, confirms on
 });
 
 test("recommendation loading, network error, empty range and mobile layout", async ({ page }) => {
-  await page.goto("/");
+  await page.goto("/app");
   const input = await recommendationFixture(page, "Phase 4 impossible event", "2097-04-01");
   const rejected = await apiData(page, "/bookings", { ...input, attendees: 999 });
   await page.goto(`/bookings/${rejected.id}`);
@@ -421,7 +436,7 @@ test("recommendation loading, network error, empty range and mobile layout", asy
 });
 
 test("failed reschedule searches trusted alternatives and atomically applies selection", async ({ page }) => {
-  await page.goto("/");
+  await page.goto("/app");
   const input = await recommendationFixture(page, "Phase 4 reschedule event", "2096-04-01");
   const original = await apiData(page, "/bookings", input);
   await apiData(page, "/bookings", { ...input, eventDate: "2096-04-02", startTime: "08:30", endTime: "21:30" });
@@ -445,11 +460,11 @@ test("failed reschedule searches trusted alternatives and atomically applies sel
 });
 
 test("resource dashboard shows real peaks, buffered timeline, filters and booking navigation", async ({ page }) => {
-  await page.goto("/");
+  await page.goto("/app");
   const input = { ...await recommendationFixture(page, "Phase 5 conference", "2094-05-01"), preferredVenueId: 1, attendees: 120 };
   const a = await apiData(page, "/bookings", input);
   await apiData(page, "/bookings", { ...input, eventName: "Phase 5 parallel workshop", attendees: 50, staffRequired: 3 });
-  await page.goto("/");
+  await page.goto("/app");
   await page.getByRole("link", { name: "Resource intelligence & timeline", exact: false }).click();
   await page.getByLabel("Resource date").fill(input.eventDate);
   await expect(page.getByRole("heading", { name: "Venue A · 2094-05-01" })).toBeVisible();
@@ -479,7 +494,7 @@ test("resource dashboard shows real peaks, buffered timeline, filters and bookin
 });
 
 test("new what-if simulation is read-only, explains conflicts and creates through protected booking API", async ({ page }) => {
-  await page.goto("/");
+  await page.goto("/app");
   const input = await recommendationFixture(page, "Phase 5 hypothetical", "2093-05-01");
   await page.goto("/simulation");
   await page.getByLabel("Proposed date").fill(input.eventDate);
@@ -508,7 +523,7 @@ test("new what-if simulation is read-only, explains conflicts and creates throug
 });
 
 test("existing what-if preserves original, rejects stale apply and applies refreshed proposal atomically", async ({ page }) => {
-  await page.goto("/");
+  await page.goto("/app");
   const input = { ...await recommendationFixture(page, "Phase 5 moved event", "2092-05-01"), preferredVenueId: 1, attendees: 120 };
   const original = await apiData(page, "/bookings", input);
   await page.goto(`/bookings/${original.id}`);
@@ -539,7 +554,7 @@ test("existing what-if preserves original, rejects stale apply and applies refre
 });
 
 test("intelligence loading, API failure recovery and stale simulation token are visible", async ({ page }) => {
-  await page.goto("/");
+  await page.goto("/app");
   await page.route("**/api/analytics/resources?**", (route) => route.abort());
   await page.getByRole("link", { name: "Resources", exact: true }).click();
   await expect(page.getByRole("alert")).toContainText("Unable to reach EventSync");
@@ -572,4 +587,158 @@ test("intelligence loading, API failure recovery and stale simulation token are 
   await expect(page.getByRole("status")).toContainText("Evaluating current reservations");
   finish();
   await expect(page.getByRole("heading", { name: "Proposal is feasible", exact: true })).toBeVisible();
+});
+
+async function logOutInUI(page) {
+  await page.locator(".account-menu summary").click();
+  await page.getByRole("button", { name: "Log out", exact: true }).click();
+  await expect(page).toHaveURL("/");
+}
+async function loginInUI(page, credentials = account) {
+  await page.getByLabel("Email address", { exact: true }).fill(credentials.email);
+  await page.getByLabel("Password", { exact: true }).fill(credentials.password);
+  await page.getByRole("button", { name: "Log in", exact: true }).click();
+}
+
+test("public homepage, feature navigation, account access and responsive landing", async ({ page }) => {
+  await page.request.post("/api/auth/logout", { data: {} });
+  await page.goto("/");
+  await expect(page.getByRole("heading", { name: /Great events start with/ })).toBeVisible();
+  await expect(page.getByRole("navigation", { name: "Main navigation" })).toHaveCount(0);
+  await page.getByRole("navigation", { name: "Public navigation" }).getByRole("link", { name: "Features", exact: true }).click();
+  await expect(page).toHaveURL("/#features");
+  await expect(page.getByRole("heading", { name: "A hall that fits" })).toBeVisible();
+  await page.getByRole("navigation", { name: "Public navigation" }).getByRole("link", { name: "How it works", exact: true }).click();
+  await expect(page).toHaveURL("/#how-it-works");
+  await expect(page.getByRole("heading", { name: "Start with a client" })).toBeVisible();
+  await page.goto("/");
+  await page.screenshot({ path: test.info().outputPath("homepage-desktop.png"), fullPage: true });
+  await page.setViewportSize({ width: 390, height: 844 });
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  await page.screenshot({ path: test.info().outputPath("homepage-mobile.png"), fullPage: true });
+  await page.getByRole("button", { name: "Menu", exact: true }).click();
+  await page.getByRole("navigation", { name: "Public navigation" }).getByRole("link", { name: "Account access" }).click();
+  await expect(page.getByRole("heading", { name: "Joining your team?" })).toBeVisible();
+  await expect(page.getByText("No recovery emails are sent", { exact: false })).toBeVisible();
+  await page.getByRole("link", { name: "I have an account" }).click();
+  await expect(page).toHaveURL("/login");
+  await page.screenshot({ path: test.info().outputPath("login-mobile.png"), fullPage: true });
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  await page.goto("/missing-public-page");
+  await expect(page.getByRole("heading", { name: "Page not found" })).toBeVisible();
+});
+
+test("invalid login, protected deep link, session restoration, profile update and logout", async ({ page, context }) => {
+  await page.request.post("/api/auth/logout", { data: {} });
+  await page.goto("/resources");
+  await expect(page).toHaveURL("/login");
+  await expect(page.getByRole("heading", { name: "Resource intelligence", exact: true })).toHaveCount(0);
+  await loginInUI(page, { email: account.email, password: randomBytes(24).toString("base64url") });
+  await expect(page.getByRole("alert")).toHaveText("Email or password is incorrect.");
+  await page.getByLabel("Show password", { exact: true }).check();
+  await expect(page.getByLabel("Password", { exact: true })).toHaveAttribute("type", "text");
+  await page.getByLabel("Show password", { exact: true }).uncheck();
+  let release;
+  const gate = new Promise((resolve) => { release = resolve; });
+  await page.route("**/api/auth/login", async (route) => { await gate; await route.continue(); });
+  await loginInUI(page);
+  await expect(page.getByRole("button", { name: "Logging in…", exact: true })).toBeDisabled();
+  await expect(page.getByRole("status")).toContainText("Checking your account");
+  release();
+  await expect(page).toHaveURL("/resources");
+  await page.unroute("**/api/auth/login");
+  await expect(page.getByRole("heading", { name: "Resource intelligence", exact: true })).toBeVisible();
+  const cookie = (await context.cookies()).find((entry) => entry.name === "eventsync_session");
+  expect(cookie.httpOnly).toBe(true); expect(cookie.sameSite).toBe("Strict");
+  expect(await page.evaluate(() => document.cookie.includes("eventsync_session"))).toBe(false);
+  await page.reload();
+  await expect(page.getByRole("heading", { name: "Resource intelligence", exact: true })).toBeVisible();
+  await page.getByRole("navigation", { name: "Main navigation" }).getByRole("link", { name: "Profile", exact: true }).click();
+  await page.getByLabel("Display name").fill("Updated browser organizer");
+  await page.getByRole("button", { name: "Save profile" }).click();
+  await expect(page.getByRole("status")).toContainText("profile has been updated");
+  await expect(page.locator(".account-menu summary")).toContainText("Updated browser organizer");
+  await page.reload();
+  await expect(page.getByLabel("Display name")).toHaveValue("Updated browser organizer");
+  await page.request.patch("/api/auth/profile", { data: { name: account.name } });
+  await logOutInUI(page);
+  expect((await page.request.get("/api/bookings")).status()).toBe(401);
+  await page.goto("/bookings"); await expect(page).toHaveURL("/login");
+});
+
+test("administrator provisions staff; status, staff permissions and real password change work", async ({ page }) => {
+  const staff = { name: "New browser staff", email: "staff@browser.invalid", password: randomBytes(24).toString("base64url") };
+  await page.goto("/users");
+  await page.getByLabel("Staff name").fill(staff.name); await page.getByLabel("Staff email").fill(staff.email);
+  await page.getByLabel("Initial password", { exact: true }).fill(staff.password);
+  await page.getByLabel("Confirm initial password").fill(staff.password);
+  await page.getByRole("button", { name: "Create staff account", exact: true }).click();
+  await expect(page.getByRole("status")).toContainText("Staff account created");
+  const row = page.locator(".staff-row").filter({ has: page.getByRole("heading", { name: staff.name, exact: true }) });
+  await expect(row).toContainText("STAFF · Active");
+  await row.getByRole("button", { name: `Disable ${staff.name}` }).click();
+  await expect(row).toContainText("Disabled");
+  expect((await page.request.post("/api/auth/login", { data: staff })).status()).toBe(401);
+  await row.getByRole("button", { name: `Enable ${staff.name}` }).click();
+  await expect(row).toContainText("Active");
+  await logOutInUI(page);
+  await page.goto("/login"); await loginInUI(page, staff); await expect(page).toHaveURL("/app");
+  await expect(page.getByRole("navigation", { name: "Main navigation" }).getByRole("link", { name: "Staff accounts" })).toHaveCount(0);
+  expect((await page.request.get("/api/users")).status()).toBe(403);
+  await page.goto("/users"); await expect(page.getByRole("alert")).toContainText("Administrator access is required");
+  await page.getByRole("navigation", { name: "Main navigation" }).getByRole("link", { name: "Settings", exact: true }).click();
+  const next = randomBytes(24).toString("base64url");
+  await page.getByLabel("Current password", { exact: true }).fill("incorrect-current-password");
+  await page.getByLabel("New password", { exact: true }).fill(next); await page.getByLabel("Confirm new password").fill(next);
+  await page.getByRole("button", { name: "Change password", exact: true }).click();
+  await expect(page.getByRole("alert")).toContainText("Current password is incorrect");
+  await page.getByLabel("Current password", { exact: true }).fill(staff.password);
+  await page.getByRole("button", { name: "Change password", exact: true }).click();
+  await expect(page).toHaveURL("/login");
+  await expect(page.getByRole("status")).toContainText("All sessions were signed out");
+  await loginInUI(page, { ...staff, password: next });
+  await expect(page).toHaveURL("/app");
+});
+
+test("workspace desktop/tablet/mobile navigation and Escape behavior", async ({ page }) => {
+  await page.goto("/app");
+  await expect(page.getByRole("heading", { name: "A little planning. A great event." })).toBeVisible();
+  await page.screenshot({ path: test.info().outputPath("workspace-desktop.png"), fullPage: true });
+  await page.setViewportSize({ width: 900, height: 1000 });
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  await page.screenshot({ path: test.info().outputPath("workspace-tablet.png"), fullPage: true });
+  await page.setViewportSize({ width: 390, height: 844 });
+  const menu = page.getByRole("button", { name: "Menu", exact: true });
+  await menu.click(); await expect(menu).toHaveAttribute("aria-expanded", "true");
+  await page.keyboard.press("Escape"); await expect(menu).toHaveAttribute("aria-expanded", "false"); await expect(menu).toBeFocused();
+  await menu.click();
+  await page.getByRole("navigation", { name: "Main navigation" }).getByRole("link", { name: "Venues", exact: true }).click();
+  await expect(menu).toHaveAttribute("aria-expanded", "false");
+  await expect(page.getByRole("heading", { name: "Venues & shared inventory" })).toBeVisible();
+  await menu.click(); await page.getByRole("navigation", { name: "Main navigation" }).getByRole("link", { name: "Profile", exact: true }).click();
+  await expect(page.getByRole("heading", { name: "My profile", exact: true })).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  await page.screenshot({ path: test.info().outputPath("profile-mobile.png"), fullPage: true });
+});
+
+test("session-check loading, network recovery and expired authentication clear protected state", async ({ page }) => {
+  let release;
+  const gate = new Promise((resolve) => { release = resolve; });
+  await page.route("**/api/auth/me", async (route) => { await gate; await route.continue(); });
+  await page.goto("/bookings");
+  await expect(page.getByRole("status")).toContainText("Restoring your session");
+  await expect(page.getByRole("heading", { name: "Your event requests." })).toHaveCount(0);
+  release();
+  await expect(page.getByRole("heading", { name: "Your event requests." })).toBeVisible();
+  await page.unroute("**/api/auth/me");
+  await page.route("**/api/auth/me", (route) => route.abort());
+  await page.reload(); await expect(page.getByRole("alert")).toContainText("Unable to reach EventSync");
+  await page.unroute("**/api/auth/me");
+  await page.getByRole("button", { name: "Retry session check" }).click();
+  await expect(page.getByRole("heading", { name: "Your event requests." })).toBeVisible();
+  await page.request.post("/api/auth/logout", { data: {} });
+  await page.getByRole("navigation", { name: "Main navigation" }).getByRole("link", { name: "Resources", exact: true }).click();
+  await expect(page).toHaveURL("/login");
+  await expect(page.getByRole("navigation", { name: "Main navigation" })).toHaveCount(0);
+  await loginInUI(page); await expect(page).toHaveURL("/resources");
 });

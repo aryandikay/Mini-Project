@@ -5,6 +5,7 @@ import { createRepository } from "../src/repositories/index.js";
 import { createService } from "../src/services/index.js";
 import { resourceSegments } from "../src/services/resourceSweep.js";
 import { createApp } from "../src/app.js";
+import { authenticatedHeaders } from "../test-support/auth.js";
 import { createDemo } from "../test-support/demo-scenarios.js";
 
 const input = { clientId: 1, eventName: "Intelligence event", eventDate: "2095-05-01",
@@ -185,9 +186,10 @@ test("real analytics/simulation API envelopes, invalid input, stale IDs and DB f
   const { db, service } = setup(t), original = service.createBooking(input);
   const server = createApp(db).listen(0, "127.0.0.1");
   await new Promise((resolve) => server.once("listening", resolve));
+  const headers = await authenticatedHeaders(db, `http://127.0.0.1:${server.address().port}`);
   const request = async (path, body) => {
-    const response = await fetch(`http://127.0.0.1:${server.address().port}/api${path}`, body === undefined ? {} : {
-      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+    const response = await fetch(`http://127.0.0.1:${server.address().port}/api${path}`, body === undefined ? { headers } : {
+      method: "POST", headers, body: JSON.stringify(body) });
     return { status: response.status, body: await response.json() };
   };
   try {
